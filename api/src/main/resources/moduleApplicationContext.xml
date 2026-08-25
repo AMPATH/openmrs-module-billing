@@ -91,6 +91,14 @@
 	<bean parent="serviceContext">
 		<property name="moduleService">
 			<list merge="true">
+				<value>org.openmrs.module.billing.api.BillableDrugService</value>
+				<ref bean="billableDrugService"/>
+			</list>
+		</property>
+	</bean>
+	<bean parent="serviceContext">
+		<property name="moduleService">
+			<list merge="true">
 				<value>org.openmrs.module.billing.api.CashierItemPriceService</value>
 				<ref bean="cashierItemPriceService"/>
 			</list>
@@ -211,6 +219,16 @@
 		<property name="preInterceptors" ref="serviceInterceptors"/>
 		<property name="transactionAttributeSource" ref="transactionAttributeSource"/>
 	</bean>
+	<bean id="billableDrugService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+		<property name="transactionManager" ref="transactionManager"/>
+		<property name="target">
+			<bean class="org.openmrs.module.billing.api.impl.BillableDrugServiceImpl">
+				<property name="billableDrugDAO" ref="billableDrugDAO"/>
+			</bean>
+		</property>
+		<property name="preInterceptors" ref="serviceInterceptors"/>
+		<property name="transactionAttributeSource" ref="transactionAttributeSource"/>
+	</bean>
 	<bean id="cashierItemPriceService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
 		<property name="transactionManager" ref="transactionManager"/>
 		<property name="target">
@@ -300,6 +318,10 @@
 		  class="org.openmrs.module.billing.api.db.hibernate.HibernateBillableServiceDAOImpl">
 		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
 	</bean>
+	<bean id="billableDrugDAO"
+		  class="org.openmrs.module.billing.api.db.hibernate.HibernateBillableDrugDAOImpl">
+		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
+	</bean>
 	<bean id="paymentModeDAO"
 		  class="org.openmrs.module.billing.api.db.hibernate.HibernatePaymentModeDAOImpl">
 		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
@@ -326,6 +348,9 @@
 
 	<bean id="testOrderBillingStrategy"
 		  class="org.openmrs.module.billing.api.billing.impl.TestOrderBillingStrategy"/>
+
+	<bean id="conceptOrderBillingStrategy"
+		  class="org.openmrs.module.billing.api.billing.impl.ConceptOrderBillingStrategy"/>
 
 	<bean id="ruleEngine"
 		  class="org.openmrs.module.billing.api.evaluator.ExemptionRuleEngine">

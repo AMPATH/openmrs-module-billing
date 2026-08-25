@@ -12,11 +12,13 @@ package org.openmrs.module.billing.web.rest.resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.billing.api.BillableDrugService;
 import org.openmrs.module.billing.api.BillableServiceService;
 import org.openmrs.module.billing.api.BillLineItemService;
 import org.openmrs.module.billing.api.BillService;
 import org.openmrs.module.billing.web.base.resource.BaseRestDataResource;
 import org.openmrs.module.billing.web.rest.controller.base.CashierResourceController;
+import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.BillableService;
 import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.billing.api.base.entity.IEntityDataService;
@@ -50,11 +52,13 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
 			description.addProperty("item");
 			description.addProperty("billableService", Representation.REF);
+			description.addProperty("billableDrug", Representation.REF);
 			description.addProperty("quantity");
 			description.addProperty("price");
 			description.addProperty("priceName");
 			description.addProperty("priceUuid");
 			description.addProperty("lineItemOrder");
+			description.addProperty("batchNumber");
 			description.addProperty("status");
 			return description;
 		}
@@ -75,6 +79,13 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 		instance.setBillableService(service.getBillableServiceByUuid(serviceUuid));
 	}
 	
+	@PropertySetter(value = "billableDrug")
+	public void setBillableDrug(BillLineItem instance, Object item) {
+		BillableDrugService service = Context.getService(BillableDrugService.class);
+		String drugUuid = (String) item;
+		instance.setBillableDrug(service.getBillableDrugByUuid(drugUuid));
+	}
+	
 	@PropertyGetter(value = "item")
 	public String getItem(BillLineItem instance) {
 		try {
@@ -91,6 +102,17 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 		try {
 			BillableService service = instance.getBillableService();
 			return service.getName();
+		}
+		catch (Exception e) {
+			return "";
+		}
+	}
+	
+	@PropertyGetter(value = "billableDrug")
+	public String getBillableDrug(BillLineItem instance) {
+		try {
+			BillableDrug drug = instance.getBillableDrug();
+			return drug.getName();
 		}
 		catch (Exception e) {
 			return "";

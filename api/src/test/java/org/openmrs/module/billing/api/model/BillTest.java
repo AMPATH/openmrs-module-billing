@@ -457,6 +457,93 @@ public class BillTest {
 	}
 	
 	@Test
+	public void synchronizeBillStatus_shouldMarkOnlyAllocatedLineItemsPaid() {
+		Bill bill = new Bill();
+		bill.setLineItems(new ArrayList<>());
+		bill.setPayments(new HashSet<>());
+		
+		BillLineItem line1 = new BillLineItem();
+		line1.setUuid("line-1");
+		line1.setId(1);
+		line1.setPrice(BigDecimal.valueOf(100));
+		line1.setQuantity(1);
+		line1.setVoided(false);
+		line1.setStatus(BillLineItemStatus.PENDING);
+		bill.getLineItems().add(line1);
+		
+		BillLineItem line2 = new BillLineItem();
+		line2.setUuid("line-2");
+		line2.setId(2);
+		line2.setPrice(BigDecimal.valueOf(50));
+		line2.setQuantity(1);
+		line2.setVoided(false);
+		line2.setStatus(BillLineItemStatus.PENDING);
+		bill.getLineItems().add(line2);
+		
+		Payment payment = new Payment();
+		payment.setAmountTendered(BigDecimal.valueOf(100));
+		payment.setVoided(false);
+		PaymentLineItemAllocation allocation = new PaymentLineItemAllocation();
+		allocation.setBillLineItem(line1);
+		allocation.setAmount(BigDecimal.valueOf(100));
+		allocation.setVoided(false);
+		payment.addLineItemAllocation(allocation);
+		bill.getPayments().add(payment);
+		
+		bill.synchronizeBillStatus();
+		
+		assertEquals(BillStatus.POSTED, bill.getStatus());
+		assertEquals(BillLineItemStatus.PAID, line1.getStatus());
+		assertEquals(BillLineItemStatus.PENDING, line2.getStatus());
+	}
+	
+	@Test
+	public void synchronizeBillStatus_shouldMarkBillPaidWhenAllAllocatedLinesArePaid() {
+		Bill bill = new Bill();
+		bill.setLineItems(new ArrayList<>());
+		bill.setPayments(new HashSet<>());
+		
+		BillLineItem line1 = new BillLineItem();
+		line1.setUuid("line-1");
+		line1.setId(1);
+		line1.setPrice(BigDecimal.valueOf(40));
+		line1.setQuantity(1);
+		line1.setVoided(false);
+		line1.setStatus(BillLineItemStatus.PENDING);
+		bill.getLineItems().add(line1);
+		
+		BillLineItem line2 = new BillLineItem();
+		line2.setUuid("line-2");
+		line2.setId(2);
+		line2.setPrice(BigDecimal.valueOf(60));
+		line2.setQuantity(1);
+		line2.setVoided(false);
+		line2.setStatus(BillLineItemStatus.PENDING);
+		bill.getLineItems().add(line2);
+		
+		Payment payment = new Payment();
+		payment.setAmountTendered(BigDecimal.valueOf(100));
+		payment.setVoided(false);
+		PaymentLineItemAllocation a1 = new PaymentLineItemAllocation();
+		a1.setBillLineItem(line1);
+		a1.setAmount(BigDecimal.valueOf(40));
+		a1.setVoided(false);
+		payment.addLineItemAllocation(a1);
+		PaymentLineItemAllocation a2 = new PaymentLineItemAllocation();
+		a2.setBillLineItem(line2);
+		a2.setAmount(BigDecimal.valueOf(60));
+		a2.setVoided(false);
+		payment.addLineItemAllocation(a2);
+		bill.getPayments().add(payment);
+		
+		bill.synchronizeBillStatus();
+		
+		assertEquals(BillStatus.PAID, bill.getStatus());
+		assertEquals(BillLineItemStatus.PAID, line1.getStatus());
+		assertEquals(BillLineItemStatus.PAID, line2.getStatus());
+	}
+	
+	@Test
 	public void setLineItems_shouldAllowSettingLineItemsOnNewBill() {
 		Bill bill = new Bill();
 		bill.setStatus(BillStatus.PENDING);

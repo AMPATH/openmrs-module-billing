@@ -37,6 +37,8 @@ public class BillLineItem extends BaseChangeableOpenmrsData {
 	
 	private BillableService billableService;
 	
+	private BillableDrug billableDrug;
+	
 	private BigDecimal price;
 	
 	private String priceName;
@@ -50,6 +52,12 @@ public class BillLineItem extends BaseChangeableOpenmrsData {
 	private BillLineItemStatus status;
 	
 	private Order order;
+	
+	/**
+	 * Optional lot/batch identifier for drug lines, supplied by the frontend (e.g. from Odoo) for
+	 * inventory sync. Not used for price selection.
+	 */
+	private String batchNumber;
 	
 	@Override
 	public Integer getId() {

@@ -62,33 +62,31 @@ public class BillValidator implements Validator {
 	 * @param errors the errors object to add validation errors to
 	 */
 	private void validateLineItemsNotModified(Bill bill, Errors errors) {
-		// Only check existing bills that are not editable
+		// Fully editable bills (PENDING) may change line items freely
 		if (bill.getId() == null || bill.editable()) {
 			return;
 		}
 		
-		// Get the original line item IDs from the database
 		BillLineItemService billLineItemService = Context.getService(BillLineItemService.class);
 		List<Integer> originalLineItemIds = billLineItemService.getPersistedLineItemIds(bill.getId());
 		
 		Set<Integer> originalIds = new HashSet<>(originalLineItemIds);
 		
-		// Get current line item IDs (only those that have been persisted, i.e., have an ID)
 		Set<Integer> currentIds = new HashSet<>();
 		if (bill.getLineItems() != null) {
 			currentIds = bill.getLineItems().stream().map(BillLineItem::getId).filter(id -> id != null)
 			        .collect(Collectors.toSet());
 		}
 		
-		// Check if any line items were removed
+		// Removals are never allowed once the bill is no longer PENDING
 		Set<Integer> removedIds = new HashSet<>(originalIds);
 		removedIds.removeAll(currentIds);
 		if (!removedIds.isEmpty()) {
 			errors.reject("billing.error.lineItemsCannotBeRemovedFromNonPendingBill");
 		}
 		
-		// Check if any new line items were added (new items have null ID)
-		if (bill.getLineItems() != null) {
+		// POSTED bills may receive new line items (visit consolidation); PAID/etc may not
+		if (bill.getLineItems() != null && !bill.acceptsNewLineItems()) {
 			boolean hasNewLineItems = bill.getLineItems().stream().anyMatch(item -> item.getId() == null);
 			if (hasNewLineItems) {
 				errors.reject("billing.error.lineItemsCannotBeAddedToNonPendingBill");

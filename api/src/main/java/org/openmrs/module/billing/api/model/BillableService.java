@@ -14,6 +14,7 @@ import java.util.List;
 
 import org.openmrs.BaseChangeableOpenmrsMetadata;
 import org.openmrs.Concept;
+import org.openmrs.Location;
 
 public class BillableService extends BaseChangeableOpenmrsMetadata {
 	
@@ -30,6 +31,8 @@ public class BillableService extends BaseChangeableOpenmrsMetadata {
 	private Concept serviceType;
 	
 	private Concept serviceCategory;
+	
+	private Location location;
 	
 	private List<CashierItemPrice> servicePrices;
 	
@@ -107,6 +110,14 @@ public class BillableService extends BaseChangeableOpenmrsMetadata {
 	
 	public void setConcept(Concept concept) {
 		this.concept = concept;
+	}
+	
+	public Location getLocation() {
+		return location;
+	}
+	
+	public void setLocation(Location location) {
+		this.location = location;
 	}
 	
 	public void addServicePrice(CashierItemPrice price) {

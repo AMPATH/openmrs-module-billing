@@ -1431,4 +1431,147 @@
 		                         onDelete="CASCADE"/>
 	</changeSet>
 
+	<changeSet id="openmrs.billing-014-20260825-billable-drug-and-location" author="ampath">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<tableExists tableName="cashier_billable_drug"/>
+			</not>
+		</preConditions>
+		<comment>Add BillableDrug catalog, location on BillableService, batch on line items, payment line allocations</comment>
+
+		<createTable tableName="cashier_billable_drug">
+			<column name="billable_drug_id" type="int" autoIncrement="true">
+				<constraints nullable="false" primaryKey="true"/>
+			</column>
+			<column name="name" type="varchar(255)"><constraints nullable="false"/></column>
+			<column name="short_name" type="varchar(255)"/>
+			<column name="drug_id" type="int"/>
+			<column name="location_id" type="int"/>
+			<column name="status" type="varchar(50)"><constraints nullable="false"/></column>
+			<column name="creator" type="int"><constraints nullable="false"/></column>
+			<column name="date_created" type="DATETIME"><constraints nullable="false"/></column>
+			<column name="changed_by" type="int"/>
+			<column name="date_changed" type="DATETIME"/>
+			<column name="retired" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="retired_by" type="int"/>
+			<column name="date_retired" type="DATETIME"/>
+			<column name="retire_reason" type="varchar(255)"/>
+			<column name="uuid" type="char(38)"><constraints nullable="false" unique="true"/></column>
+		</createTable>
+
+		<addForeignKeyConstraint constraintName="cashier_billable_drug_drug_fk"
+		                         baseTableName="cashier_billable_drug" baseColumnNames="drug_id"
+		                         referencedTableName="drug" referencedColumnNames="drug_id"/>
+		<addForeignKeyConstraint constraintName="cashier_billable_drug_location_fk"
+		                         baseTableName="cashier_billable_drug" baseColumnNames="location_id"
+		                         referencedTableName="location" referencedColumnNames="location_id"/>
+		<addForeignKeyConstraint constraintName="cashier_billable_drug_creator_fk"
+		                         baseTableName="cashier_billable_drug" baseColumnNames="creator"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="cashier_billable_drug_changed_by_fk"
+		                         baseTableName="cashier_billable_drug" baseColumnNames="changed_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="cashier_billable_drug_retired_by_fk"
+		                         baseTableName="cashier_billable_drug" baseColumnNames="retired_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-015-20260825-billable-service-location" author="ampath">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_billable_service"/>
+				<not>
+					<columnExists tableName="cashier_billable_service" columnName="location_id"/>
+				</not>
+			</and>
+		</preConditions>
+		<addColumn tableName="cashier_billable_service">
+			<column name="location_id" type="int"/>
+		</addColumn>
+		<addForeignKeyConstraint constraintName="cashier_billable_service_location_fk"
+		                         baseTableName="cashier_billable_service" baseColumnNames="location_id"
+		                         referencedTableName="location" referencedColumnNames="location_id"/>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-016-20260825-item-price-billable-drug" author="ampath">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_item_price"/>
+				<tableExists tableName="cashier_billable_drug"/>
+				<not>
+					<columnExists tableName="cashier_item_price" columnName="billable_drug_id"/>
+				</not>
+			</and>
+		</preConditions>
+		<addColumn tableName="cashier_item_price">
+			<column name="billable_drug_id" type="int"/>
+		</addColumn>
+		<addForeignKeyConstraint constraintName="cashier_item_price_billable_drug_fk"
+		                         baseTableName="cashier_item_price" baseColumnNames="billable_drug_id"
+		                         referencedTableName="cashier_billable_drug" referencedColumnNames="billable_drug_id"
+		                         onDelete="CASCADE" onUpdate="CASCADE"/>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-017-20260825-line-item-billable-drug-batch" author="ampath">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_bill_line_item"/>
+				<tableExists tableName="cashier_billable_drug"/>
+				<not>
+					<columnExists tableName="cashier_bill_line_item" columnName="billable_drug_id"/>
+				</not>
+			</and>
+		</preConditions>
+		<addColumn tableName="cashier_bill_line_item">
+			<column name="billable_drug_id" type="int"/>
+		</addColumn>
+		<addColumn tableName="cashier_bill_line_item">
+			<column name="batch_number" type="varchar(255)"/>
+		</addColumn>
+		<addForeignKeyConstraint constraintName="cashier_bill_line_item_billable_drug_fk"
+		                         baseTableName="cashier_bill_line_item" baseColumnNames="billable_drug_id"
+		                         referencedTableName="cashier_billable_drug" referencedColumnNames="billable_drug_id"/>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-018-20260825-payment-line-item-allocation" author="ampath">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<tableExists tableName="cashier_bill_payment_line_item"/>
+			</not>
+		</preConditions>
+		<createTable tableName="cashier_bill_payment_line_item">
+			<column name="payment_line_item_id" type="int" autoIncrement="true">
+				<constraints nullable="false" primaryKey="true"/>
+			</column>
+			<column name="bill_payment_id" type="int"><constraints nullable="false"/></column>
+			<column name="bill_line_item_id" type="int"><constraints nullable="false"/></column>
+			<column name="amount" type="decimal(10,2)"><constraints nullable="false"/></column>
+			<column name="creator" type="int"><constraints nullable="false"/></column>
+			<column name="date_created" type="DATETIME"><constraints nullable="false"/></column>
+			<column name="changed_by" type="int"/>
+			<column name="date_changed" type="DATETIME"/>
+			<column name="voided" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+			<column name="voided_by" type="int"/>
+			<column name="date_voided" type="DATETIME"/>
+			<column name="void_reason" type="varchar(255)"/>
+			<column name="uuid" type="char(38)"><constraints nullable="false" unique="true"/></column>
+		</createTable>
+		<addForeignKeyConstraint constraintName="cashier_payment_line_item_payment_fk"
+		                         baseTableName="cashier_bill_payment_line_item" baseColumnNames="bill_payment_id"
+		                         referencedTableName="cashier_bill_payment" referencedColumnNames="bill_payment_id"
+		                         onDelete="CASCADE"/>
+		<addForeignKeyConstraint constraintName="cashier_payment_line_item_line_fk"
+		                         baseTableName="cashier_bill_payment_line_item" baseColumnNames="bill_line_item_id"
+		                         referencedTableName="cashier_bill_line_item" referencedColumnNames="bill_line_item_id"/>
+		<addForeignKeyConstraint constraintName="cashier_payment_line_item_creator_fk"
+		                         baseTableName="cashier_bill_payment_line_item" baseColumnNames="creator"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="cashier_payment_line_item_changed_by_fk"
+		                         baseTableName="cashier_bill_payment_line_item" baseColumnNames="changed_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="cashier_payment_line_item_voided_by_fk"
+		                         baseTableName="cashier_bill_payment_line_item" baseColumnNames="voided_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+	</changeSet>
+
 </databaseChangeLog>

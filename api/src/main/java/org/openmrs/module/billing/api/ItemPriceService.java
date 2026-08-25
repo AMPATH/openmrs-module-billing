@@ -12,6 +12,7 @@ package org.openmrs.module.billing.api;
 import java.util.List;
 
 import org.openmrs.module.billing.api.base.entity.IMetadataDataService;
+import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.BillableService;
 import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.stockmanagement.api.model.StockItem;
@@ -25,4 +26,6 @@ public interface ItemPriceService extends IMetadataDataService<CashierItemPrice>
 	List<CashierItemPrice> getItemPrice(StockItem stockItem);
 	
 	List<CashierItemPrice> getServicePrice(BillableService billableService);
+	
+	List<CashierItemPrice> getDrugPrice(BillableDrug billableDrug);
 }

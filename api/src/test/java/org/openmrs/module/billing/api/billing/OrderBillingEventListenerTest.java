@@ -201,17 +201,15 @@ public class OrderBillingEventListenerTest extends BaseModuleContextSensitiveTes
 		assertTrue(voidedLineItem.getVoided(), "Original line item should be voided after revision");
 		assertEquals("Order revised", voidedLineItem.getVoidReason());
 		
-		// 5. Verify a new bill was created with a new line item
+		// 5. Verify the revised order gets a new line item on the same visit bill (consolidation)
 		List<Bill> updatedBills = billService.getBillsByPatientUuid(patient.getUuid(), null);
-		assertTrue(updatedBills.size() >= 2, "A new bill should be created for the revised order");
+		assertEquals(1, updatedBills.size(), "Revised order should append to the existing visit bill");
 		
-		Bill newBill = updatedBills.stream().filter(b -> !b.getId().equals(bills.get(0).getId())).findFirst().orElse(null);
-		assertNotNull(newBill);
-		assertFalse(newBill.getLineItems().isEmpty());
-		
-		BillLineItem newLineItem = newBill.getLineItems().get(0);
-		assertFalse(newLineItem.getVoided());
-		assertEquals(savedRevise.getId(), newLineItem.getOrder().getId());
+		Bill bill = updatedBills.get(0);
+		BillLineItem newLineItem = bill.getLineItems().stream()
+		        .filter(li -> !li.getVoided() && li.getOrder() != null && li.getOrder().getId().equals(savedRevise.getId()))
+		        .findFirst().orElse(null);
+		assertNotNull(newLineItem, "A non-voided line item should exist for the revised order");
 		assertEquals(new BigDecimal("75.00"), newLineItem.getPrice());
 	}
 	

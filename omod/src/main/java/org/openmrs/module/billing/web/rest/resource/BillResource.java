@@ -351,6 +351,11 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 			billSearch.setVisitUuid(visitUuid);
 		}
 		
+		String locationUuid = context.getRequest().getParameter("locationUuid");
+		if (StringUtils.isNotBlank(locationUuid)) {
+			billSearch.setLocationUuid(locationUuid);
+		}
+		
 		String discountStatus = context.getRequest().getParameter("discountStatus");
 		if (StringUtils.isNotBlank(discountStatus)) {
 			billSearch.setDiscountStatuses(parseDiscountStatuses(discountStatus));

@@ -22,10 +22,14 @@ import javax.annotation.Nonnull;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.openmrs.Location;
 
 import static org.openmrs.module.billing.api.db.hibernate.PagingUtil.applyPaging;
 
@@ -99,11 +103,22 @@ public class HibernateBillableServiceDAOImpl implements BillableServiceDAO {
 			predicates.add(cb.equal(root.get("concept").get("uuid"), billableServiceSearch.getConceptUuid()));
 		}
 		
+		if (StringUtils.isNotEmpty(billableServiceSearch.getLocationUuid())) {
+			// LEFT JOIN so global rows (location IS NULL) are not dropped by an implicit inner join
+			Join<BillableService, Location> locationJoin = root.join("location", JoinType.LEFT);
+			if (Boolean.TRUE.equals(billableServiceSearch.getIncludeGlobal())) {
+				predicates.add(cb.or(cb.equal(locationJoin.get("uuid"), billableServiceSearch.getLocationUuid()),
+				    cb.isNull(locationJoin)));
+			} else {
+				predicates.add(cb.equal(locationJoin.get("uuid"), billableServiceSearch.getLocationUuid()));
+			}
+		}
+		
 		if (StringUtils.isNotEmpty(billableServiceSearch.getName())) {
 			predicates.add(cb.like(cb.lower(root.get("name")), "%" + billableServiceSearch.getName().toLowerCase() + "%"));
 		}
 		
-		if (!billableServiceSearch.getIncludeRetired()) {
+		if (!Boolean.TRUE.equals(billableServiceSearch.getIncludeRetired())) {
 			predicates.add(cb.equal(root.get("retired"), false));
 		}
 		

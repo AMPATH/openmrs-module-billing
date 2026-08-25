@@ -12,7 +12,9 @@ package org.openmrs.module.billing.web.rest.resource;
 import org.apache.commons.lang3.BooleanUtils;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.web.rest.controller.base.CashierResourceController;
+import org.openmrs.module.billing.api.BillableDrugService;
 import org.openmrs.module.billing.api.CashierItemPriceService;
+import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.stockmanagement.api.StockManagementService;
 import org.openmrs.module.stockmanagement.api.model.StockItem;
@@ -60,6 +62,7 @@ public class CashierItemPriceResource extends MetadataDelegatingCrudResource<Cas
 			description.addProperty("paymentMode");
 			description.addProperty("item");
 			description.addProperty("billableService", Representation.REF);
+			description.addProperty("billableDrug", Representation.REF);
 		} else if (rep instanceof CustomRepresentation) {
 			//For custom representation, must be null
 			// - let the user decide which properties should be included in the response
@@ -86,6 +89,7 @@ public class CashierItemPriceResource extends MetadataDelegatingCrudResource<Cas
 		description.addProperty("paymentMode");
 		description.addProperty("item");
 		description.addProperty("billableService");
+		description.addProperty("billableDrug");
 		return description;
 	}
 	
@@ -112,11 +116,30 @@ public class CashierItemPriceResource extends MetadataDelegatingCrudResource<Cas
 		instance.setItem(service.getStockItemByUuid(itemUuid));
 	}
 	
+	@PropertySetter(value = "billableDrug")
+	public void setBillableDrug(CashierItemPrice instance, Object item) {
+		BillableDrugService service = Context.getService(BillableDrugService.class);
+		String uuid = (String) item;
+		instance.setBillableDrug(service.getBillableDrugByUuid(uuid));
+	}
+	
 	@PropertyGetter(value = "item")
 	public String getItem(CashierItemPrice instance) {
 		try {
 			StockItem stockItem = instance.getItem();
 			return stockItem.getDrug().getName();
+		}
+		catch (Exception e) {
+			log.error(e);
+			return "";
+		}
+	}
+	
+	@PropertyGetter(value = "billableDrug")
+	public String getBillableDrug(CashierItemPrice instance) {
+		try {
+			BillableDrug drug = instance.getBillableDrug();
+			return drug != null ? drug.getName() : "";
 		}
 		catch (Exception e) {
 			log.error(e);

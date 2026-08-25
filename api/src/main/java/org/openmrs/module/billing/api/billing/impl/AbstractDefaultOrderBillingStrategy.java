@@ -10,6 +10,7 @@
 package org.openmrs.module.billing.api.billing.impl;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -20,11 +21,14 @@ import java.util.stream.Collectors;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.openmrs.Location;
 import org.openmrs.Order;
 import org.openmrs.Patient;
 import org.openmrs.PatientProgram;
 import org.openmrs.Provider;
+import org.openmrs.Visit;
 import org.openmrs.api.ProgramWorkflowService;
+import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.api.BillExemptionService;
 import org.openmrs.module.billing.api.BillLineItemService;
 import org.openmrs.module.billing.api.BillService;
@@ -38,6 +42,7 @@ import org.openmrs.module.billing.api.model.BillLineItemStatus;
 import org.openmrs.module.billing.api.model.BillStatus;
 import org.openmrs.module.billing.api.model.CashPoint;
 import org.openmrs.module.billing.api.model.ExemptionType;
+import org.openmrs.module.billing.api.search.BillSearch;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -45,11 +50,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Default implementation base class that provides shared logic for bill creation, line item
- * voiding, exemption checking, and idempotency. Subclasses implement
+ * voiding, exemption checking, visit-level consolidation, and idempotency. Subclasses implement
  * {@link #createBillLineItem(Order)} to build the line item specific to their order type.
- * <p>
- * Strategies that need completely custom behavior should extend
- * {@link AbstractOrderBillingStrategy} directly instead.
  */
 @Slf4j
 @Setter(onMethod_ = @Autowired)
@@ -115,12 +117,6 @@ public abstract class AbstractDefaultOrderBillingStrategy extends AbstractOrderB
 		billLineItemService.voidBillLineItem(existingLineItem, reason);
 	}
 	
-	/**
-	 * Create the order-type-specific bill line item. Called by the default bill creation pipeline.
-	 *
-	 * @param order the order to create a line item for
-	 * @return the line item, or empty if the order should not be billed
-	 */
 	protected abstract Optional<BillLineItem> createBillLineItem(Order order);
 	
 	protected BillingResult createBillIfAbsent(Order order) {
@@ -135,20 +131,33 @@ public abstract class AbstractDefaultOrderBillingStrategy extends AbstractOrderB
 			return BillingResult.skipped("No billable item found for order");
 		}
 		
-		return createBill(order.getPatient(), lineItemOpt.get(), order);
+		return createOrAppendBill(order.getPatient(), lineItemOpt.get(), order);
 	}
 	
-	protected BillingResult createBill(Patient patient, BillLineItem lineItem, Order order) {
+	protected BillingResult createOrAppendBill(Patient patient, BillLineItem lineItem, Order order) {
 		Provider cashier = resolveCashier(order);
 		if (cashier == null) {
 			log.error("Cannot resolve cashier for order: {}", order.getUuid());
 			return BillingResult.skipped("Cannot resolve cashier");
 		}
 		
-		CashPoint cashPoint = resolveCashPoint();
+		CashPoint cashPoint = resolveCashPoint(order);
 		if (cashPoint == null) {
 			log.error("Cannot resolve cash point for order: {}", order.getUuid());
 			return BillingResult.skipped("Cannot resolve cash point");
+		}
+		
+		Visit visit = null;
+		if (order.getEncounter() != null) {
+			visit = order.getEncounter().getVisit();
+		}
+		
+		Bill existing = findOpenBillForVisit(patient, visit, cashPoint);
+		if (existing != null) {
+			existing.addLineItem(lineItem);
+			existing.recalculateLineItemOrder();
+			Bill saved = billService.saveBill(existing);
+			return BillingResult.created(saved);
 		}
 		
 		Bill bill = new Bill();
@@ -156,22 +165,44 @@ public abstract class AbstractDefaultOrderBillingStrategy extends AbstractOrderB
 		bill.setStatus(BillStatus.PENDING);
 		bill.setCashier(cashier);
 		bill.setCashPoint(cashPoint);
-		if (order.getEncounter() != null) {
-			bill.setVisit(order.getEncounter().getVisit());
-		}
+		bill.setVisit(visit);
 		bill.addLineItem(lineItem);
 		
 		Bill savedBill = billService.saveBill(bill);
 		return BillingResult.created(savedBill);
 	}
 	
-	// resolveCashier() and resolveCashPoint() are inherited from the interface
-	// and must be implemented by concrete strategy classes.
-	
 	/**
-	 * Create a bill line item with the common fields populated. Subclasses should set the type-specific
-	 * fields (item or billable service) on the returned line item.
+	 * Find an existing PENDING or POSTED bill for the patient+visit to consolidate line items onto.
 	 */
+	protected Bill findOpenBillForVisit(Patient patient, Visit visit, CashPoint cashPoint) {
+		if (patient == null || visit == null) {
+			return null;
+		}
+		BillSearch search = BillSearch.builder().patientUuid(patient.getUuid()).visitUuid(visit.getUuid())
+		        .statuses(Arrays.asList(BillStatus.PENDING, BillStatus.POSTED)).build();
+		if (cashPoint != null) {
+			search.setCashPointUuid(cashPoint.getUuid());
+		}
+		List<Bill> bills = billService.getBills(search, null);
+		if (bills == null || bills.isEmpty()) {
+			// Retry without cash point filter if none matched
+			if (cashPoint != null) {
+				search.setCashPointUuid(null);
+				bills = billService.getBills(search, null);
+			}
+			if (bills == null || bills.isEmpty()) {
+				return null;
+			}
+		}
+		for (Bill bill : bills) {
+			if (bill.getStatus() == BillStatus.PENDING) {
+				return bill;
+			}
+		}
+		return bills.get(0);
+	}
+	
 	protected BillLineItem createLineItem(BigDecimal price, int quantity, BillLineItemStatus paymentStatus, Order order) {
 		BillLineItem lineItem = new BillLineItem();
 		lineItem.setPrice(price);
@@ -180,6 +211,39 @@ public abstract class AbstractDefaultOrderBillingStrategy extends AbstractOrderB
 		lineItem.setLineItemOrder(0);
 		lineItem.setOrder(order);
 		return lineItem;
+	}
+	
+	protected Location resolveEncounterLocation(Order order) {
+		if (order.getEncounter() != null && order.getEncounter().getLocation() != null) {
+			return order.getEncounter().getLocation();
+		}
+		return null;
+	}
+	
+	/**
+	 * Resolve cash point from encounter location, then session location, then first available.
+	 */
+	protected CashPoint resolveCashPointForOrder(Order order) {
+		Location location = resolveEncounterLocation(order);
+		if (location == null) {
+			try {
+				Integer locationId = Context.getUserContext().getLocationId();
+				if (locationId != null) {
+					location = Context.getLocationService().getLocation(locationId);
+				}
+			}
+			catch (Exception e) {
+				log.debug("Could not resolve session location for cash point", e);
+			}
+		}
+		if (location != null) {
+			List<CashPoint> byLocation = cashPointService.getCashPointsByLocation(location, false);
+			if (byLocation != null && !byLocation.isEmpty()) {
+				return byLocation.get(0);
+			}
+		}
+		List<CashPoint> cashPoints = cashPointService.getAllCashPoints(false);
+		return cashPoints.isEmpty() ? null : cashPoints.get(0);
 	}
 	
 	protected boolean checkIfOrderIsExempted(Order order, ExemptionType exemptionType) {

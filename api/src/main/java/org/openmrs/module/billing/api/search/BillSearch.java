@@ -40,6 +40,8 @@ public class BillSearch {
 	
 	private String visitUuid;
 	
+	private String locationUuid;
+	
 	private List<BillStatus> statuses;
 	
 	private List<DiscountStatus> discountStatuses;

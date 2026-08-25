@@ -30,6 +30,8 @@ public class CashierItemPrice extends BaseChangeableOpenmrsMetadata {
 	
 	private BillableService billableService;
 	
+	private BillableDrug billableDrug;
+	
 	public CashierItemPrice() {
 		
 	}
@@ -96,5 +98,13 @@ public class CashierItemPrice extends BaseChangeableOpenmrsMetadata {
 	
 	public void setBillableService(BillableService billableService) {
 		this.billableService = billableService;
+	}
+	
+	public BillableDrug getBillableDrug() {
+		return billableDrug;
+	}
+	
+	public void setBillableDrug(BillableDrug billableDrug) {
+		this.billableDrug = billableDrug;
 	}
 }

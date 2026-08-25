@@ -11,6 +11,7 @@ package org.openmrs.module.billing.web.rest.resource;
 
 import org.apache.logging.log4j.util.Strings;
 import org.openmrs.Concept;
+import org.openmrs.Location;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.api.BillableServiceService;
 import org.openmrs.module.billing.api.base.PagingInfo;
@@ -99,6 +100,14 @@ public class BillableServiceResource extends MetadataDelegatingCrudResource<Bill
 		if (Strings.isNotEmpty(serviceName)) {
 			searchTemplate.setName(serviceName);
 		}
+		String locationUuid = context.getParameter("location");
+		if (Strings.isEmpty(locationUuid)) {
+			locationUuid = context.getParameter("locationUuid");
+		}
+		if (Strings.isNotEmpty(locationUuid)) {
+			searchTemplate.setLocationUuid(locationUuid);
+			searchTemplate.setIncludeGlobal(true);
+		}
 		
 		BillableServiceService service = Context.getService(BillableServiceService.class);
 		PagingInfo pagingInfo = PagingUtil.getPagingInfoFromContext(context);
@@ -115,6 +124,7 @@ public class BillableServiceResource extends MetadataDelegatingCrudResource<Bill
 			description.addProperty("concept");
 			description.addProperty("serviceType");
 			description.addProperty("serviceCategory");
+			description.addProperty("location", Representation.REF);
 			description.addProperty("servicePrices");
 			description.addProperty("serviceStatus");
 		} else if (rep instanceof CustomRepresentation) {
@@ -139,6 +149,12 @@ public class BillableServiceResource extends MetadataDelegatingCrudResource<Bill
 		for (CashierItemPrice itemPrice : instance.getServicePrices()) {
 			itemPrice.setBillableService(instance);
 		}
+	}
+	
+	@PropertySetter("location")
+	public void setLocation(BillableService instance, String uuid) {
+		Location location = Context.getLocationService().getLocationByUuid(uuid);
+		instance.setLocation(location);
 	}
 	
 	@Override

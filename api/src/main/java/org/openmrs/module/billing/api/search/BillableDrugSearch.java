@@ -14,22 +14,18 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.openmrs.module.billing.api.model.BillableServiceStatus;
+import org.openmrs.module.billing.api.model.BillableDrugStatus;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BillableServiceSearch {
+public class BillableDrugSearch {
 	
-	private BillableServiceStatus serviceStatus;
+	private BillableDrugStatus status;
 	
-	private String serviceCategoryUuid;
-	
-	private String serviceTypeUuid;
-	
-	private String conceptUuid;
+	private String drugUuid;
 	
 	private String locationUuid;
 	
@@ -38,9 +34,8 @@ public class BillableServiceSearch {
 	private Boolean includeRetired = false;
 	
 	/**
-	 * When true and {@link #locationUuid} is set, also include services with null location (global
-	 * catalog entries).
+	 * When true and {@link #locationUuid} is set, also include billable drugs with null location
+	 * (global catalog entries).
 	 */
 	private Boolean includeGlobal = false;
-	
 }

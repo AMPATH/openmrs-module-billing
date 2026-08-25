@@ -49,9 +49,10 @@ public interface OrderBillingStrategy extends Ordered {
 	Provider resolveCashier(Order order);
 	
 	/**
-	 * Resolve the cash point for the bill.
+	 * Resolve the cash point for the bill in the context of the given order.
 	 *
+	 * @param order the order being billed
 	 * @return the cash point, or null if one cannot be determined
 	 */
-	CashPoint resolveCashPoint();
+	CashPoint resolveCashPoint(Order order);
 }
