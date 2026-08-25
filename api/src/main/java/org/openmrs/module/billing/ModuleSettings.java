@@ -65,6 +65,15 @@ public class ModuleSettings {
 	
 	public static final String PATIENT_PAYMENT_STATUS_RESOLVER = "billing.patientPaymentStatusResolver";
 	
+	/** UUID of the location used to default/backfill bill locations. */
+	public static final String DEFAULT_LOCATION_UUID = "billing.defaultLocationUuid";
+	
+	/**
+	 * When true, billing queries are automatically restricted to {@link Context#getLocation()}.
+	 * Defaults to false for backward compatibility.
+	 */
+	public static final String ENFORCE_LOCATION_SCOPE = "billing.enforceLocationScope";
+	
 	private static final AdministrationService administrationService;
 	
 	static {

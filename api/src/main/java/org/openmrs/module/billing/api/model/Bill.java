@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.openmrs.BaseOpenmrsData;
+import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
 import org.openmrs.Visit;
@@ -48,6 +49,12 @@ public class Bill extends BaseOpenmrsData {
 	private Patient patient;
 	
 	private CashPoint cashPoint;
+	
+	/**
+	 * The location this bill belongs to. Nullable for backward compatibility; new bills should always
+	 * carry a location so per-location partitioning and reporting work.
+	 */
+	private Location location;
 	
 	private Visit visit;
 	

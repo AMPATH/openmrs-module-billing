@@ -15,18 +15,20 @@ import java.util.Optional;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.openmrs.Location;
 import org.openmrs.Order;
 import org.openmrs.Provider;
 import org.openmrs.TestOrder;
+import org.openmrs.api.context.Context;
+import org.openmrs.module.billing.ModuleSettings;
 import org.openmrs.module.billing.api.model.BillLineItemStatus;
 import org.openmrs.module.billing.api.model.CashPoint;
+import org.openmrs.module.billing.api.LocationBillableServiceService;
 import org.openmrs.module.billing.api.BillableServiceService;
-import org.openmrs.module.billing.api.ItemPriceService;
 import org.openmrs.module.billing.api.model.BillLineItem;
 import org.openmrs.module.billing.api.model.BillStatus;
 import org.openmrs.module.billing.api.model.BillableService;
 import org.openmrs.module.billing.api.model.BillableServiceStatus;
-import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.billing.api.model.ExemptionType;
 import org.openmrs.module.billing.api.search.BillableServiceSearch;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +43,7 @@ public class TestOrderBillingStrategy extends AbstractDefaultOrderBillingStrateg
 	
 	private BillableServiceService billableServiceService;
 	
-	private ItemPriceService itemPriceService;
+	private LocationBillableServiceService locationBillableServiceService;
 	
 	@Override
 	protected boolean supportsOrder(Order order) {
@@ -77,12 +79,31 @@ public class TestOrderBillingStrategy extends AbstractDefaultOrderBillingStrateg
 		return Optional.of(lineItem);
 	}
 	
+	/**
+	 * Centralized effective price resolution: honours the location override when the session location
+	 * is known (or enforceLocationScope is enabled), otherwise falls back to the service's default
+	 * price — identical to legacy behaviour.
+	 */
 	private BigDecimal resolvePrice(BillableService billableService) {
-		List<CashierItemPrice> itemPrices = itemPriceService.getServicePrice(billableService);
-		if (!itemPrices.isEmpty()) {
-			return itemPrices.get(0).getPrice();
+		return locationBillableServiceService.getEffectivePrice(billableService, resolveBillingLocation());
+	}
+	
+	private Location resolveBillingLocation() {
+		if (enforceLocationScope()) {
+			return Context.getUserContext() != null ? Context.getUserContext().getLocation() : null;
 		}
-		return BigDecimal.ZERO;
+		return null;
+	}
+	
+	private boolean enforceLocationScope() {
+		try {
+			String value = Context.getAdministrationService().getGlobalProperty(ModuleSettings.ENFORCE_LOCATION_SCOPE);
+			return Boolean.parseBoolean(value);
+		}
+		catch (Exception e) {
+			log.debug("Unable to read global property {}, defaulting to false", ModuleSettings.ENFORCE_LOCATION_SCOPE, e);
+			return false;
+		}
 	}
 	
 	@Override

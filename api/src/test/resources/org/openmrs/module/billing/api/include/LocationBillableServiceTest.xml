@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+
+    This Source Code Form is subject to the terms of the Mozilla Public License,
+    v. 2.0. If a copy of the MPL was not distributed with this file, You can
+    obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+    the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+
+    Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+    graphic logo is a trademark of OpenMRS Inc.
+
+-->
+<dataset>
+	<!-- Locations (location_id=0 already exists in CoreTest-2.0) -->
+	<location location_id="100" name="Billing Test Location A" creator="1"
+	          date_created="2012-01-01 00:00:00.0" retired="false"
+	          uuid="11111111-aaaa-2222-bbbb-333333333301"/>
+	<location location_id="101" name="Billing Test Location B" creator="1"
+	          date_created="2012-01-01 00:00:00.0" retired="false"
+	          uuid="11111111-aaaa-2222-bbbb-333333333302"/>
+
+	<!-- Billable services -->
+	<cashier_billable_service service_id="50" name="Location Service X" short_name="LSX"
+	                          service_status="ENABLED" creator="1"
+	                          date_created="2012-01-01 00:00:00.0" retired="false"
+	                          uuid="7631b434-78aa-102b-91a0-005e378eb690"/>
+	<cashier_billable_service service_id="51" name="Location Service Y" short_name="LSY"
+	                          service_status="ENABLED" creator="1"
+	                          date_created="2012-01-01 00:00:00.0" retired="false"
+	                          uuid="7631b434-78aa-102b-91a0-005e378eb691"/>
+
+	<!-- Default prices -->
+	<cashier_item_price item_price_id="60" name="Default price X" price="10.00" service_id="50"
+	                    creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="7631b434-78aa-102b-91a0-005e378eb6a0"/>
+	<cashier_item_price item_price_id="61" name="Default price Y" price="20.00" service_id="51"
+	                    creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="7631b434-78aa-102b-91a0-005e378eb6a1"/>
+
+	<!-- Per-location groups -->
+	<billing_billable_service_group billable_service_group_id="70" name="Lab Group A"
+	                                description="Group at location A" location_id="100"
+	                                creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                                uuid="7631b434-78aa-102b-91a0-005e378eb6b0"/>
+	<billing_billable_service_group billable_service_group_id="71" name="Imaging Group B"
+	                                description="Group at location B" location_id="101"
+	                                creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                                uuid="7631b434-78aa-102b-91a0-005e378eb6b1"/>
+
+	<!-- Per-location mappings with overrides -->
+	<billing_location_billable_service location_billable_service_id="80" location_id="100" billable_service_id="50"
+	                                   service_group_id="70" price_override="15.50" enabled="true" display_order="1"
+	                                   creator="1" date_created="2012-01-01 00:00:00.0" voided="false"
+	                                   uuid="7631b434-78aa-102b-91a0-005e378eb6c0"/>
+	<billing_location_billable_service location_billable_service_id="81" location_id="100" billable_service_id="51"
+	                                   enabled="true" display_order="2"
+	                                   creator="1" date_created="2012-01-01 00:00:00.0" voided="false"
+	                                   uuid="7631b434-78aa-102b-91a0-005e378eb6c1"/>
+	<billing_location_billable_service location_billable_service_id="82" location_id="101" billable_service_id="50"
+	                                   service_group_id="71" price_override="99.00" enabled="true" display_order="1"
+	                                   creator="1" date_created="2012-01-01 00:00:00.0" voided="false"
+	                                   uuid="7631b434-78aa-102b-91a0-005e378eb6c2"/>
+
+	<!-- Cash point referenced by the bills below -->
+	<cashier_cash_point cash_point_id="0" name="Test 1 Cash Point" description="Some cash point location"
+	                    creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="4028814B39BB04B90139BB04B98B0000"
+	                    location_id="0"/>
+
+	<!-- Bills partitioned by location -->
+	<cashier_bill bill_id="200" receipt_number="loc receipt A" provider_id="0" patient_id="0"
+	              cash_point_id="0" status="POSTED" location_id="100"
+	              creator="1" date_created="2012-01-01 00:00:00.0" voided="false"
+	              uuid="4028814B39B565A20139B95D74360200" receipt_printed="0"/>
+	<cashier_bill bill_id="201" receipt_number="loc receipt B" provider_id="0" patient_id="0"
+	              cash_point_id="0" status="POSTED" location_id="101"
+	              creator="1" date_created="2012-01-02 00:00:00.0" voided="false"
+	              uuid="4028814B39B565A20139B95D74360201" receipt_printed="0"/>
+	<cashier_bill bill_id="202" receipt_number="no location receipt" provider_id="0" patient_id="0"
+	              cash_point_id="0" status="POSTED"
+	              creator="1" date_created="2012-01-03 00:00:00.0" voided="false"
+	              uuid="4028814B39B565A20139B95D74360202" receipt_printed="0"/>
+</dataset>

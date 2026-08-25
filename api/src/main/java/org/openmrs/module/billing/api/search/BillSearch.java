@@ -40,6 +40,9 @@ public class BillSearch {
 	
 	private String visitUuid;
 	
+	/** UUID of a {@link org.openmrs.Location} to restrict results to (location partitioning). */
+	private String locationUuid;
+	
 	private List<BillStatus> statuses;
 	
 	private List<DiscountStatus> discountStatuses;

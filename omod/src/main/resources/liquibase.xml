@@ -1431,4 +1431,226 @@
 		                         onDelete="CASCADE"/>
 	</changeSet>
 
+	<!-- ==================================================================== -->
+	<!-- Location-based partitioning of billing data                          -->
+	<!-- ==================================================================== -->
+
+	<changeSet id="openmrs.billing-014-20260824-add-location-to-bill" author="goose">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_bill"/>
+				<not>
+					<columnExists tableName="cashier_bill" columnName="location_id"/>
+				</not>
+			</and>
+		</preConditions>
+		<comment>Add nullable location_id to cashier_bill plus FK and composite (location_id, date_created) index for location-partitioned reporting.</comment>
+		<addColumn tableName="cashier_bill">
+			<column name="location_id" type="int">
+				<constraints nullable="true"/>
+			</column>
+		</addColumn>
+		<addForeignKeyConstraint constraintName="cashier_bill_location_fk"
+		                         baseTableName="cashier_bill" baseColumnNames="location_id"
+		                         referencedTableName="location" referencedColumnNames="location_id"/>
+		<createIndex indexName="cashier_bill_location_date_created_idx" tableName="cashier_bill">
+			<column name="location_id"/>
+			<column name="date_created"/>
+		</createIndex>
+		<rollback>
+			<dropIndex indexName="cashier_bill_location_date_created_idx" tableName="cashier_bill"/>
+			<dropForeignKeyConstraint baseTableName="cashier_bill" constraintName="cashier_bill_location_fk"/>
+			<dropColumn tableName="cashier_bill" columnName="location_id"/>
+		</rollback>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-015-20260824-backfill-bill-location" author="goose">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_bill"/>
+				<tableExists tableName="global_property"/>
+				<tableExists tableName="location"/>
+				<columnExists tableName="cashier_bill" columnName="location_id"/>
+			</and>
+		</preConditions>
+		<comment>Idempotent backfill of cashier_bill.location_id from global property billing.defaultLocationUuid. Re-runnable: only rows with NULL location are touched.</comment>
+		<sql>
+			UPDATE cashier_bill
+			SET location_id = (SELECT l.location_id FROM location l
+			                   JOIN global_property gp ON gp.value = l.uuid
+			                   WHERE gp.property = 'billing.defaultLocationUuid'
+			                     AND gp.value IS NOT NULL)
+			WHERE location_id IS NULL
+			  AND EXISTS (SELECT 1 FROM location l2
+			              JOIN global_property gp2 ON gp2.value = l2.uuid
+			              WHERE gp2.property = 'billing.defaultLocationUuid'
+			                AND gp2.value IS NOT NULL)
+		</sql>
+		<rollback>
+			<!-- Data-only changeset: restoring pre-backfill NULLs would destroy correct per-location
+			     assignments made after the backfill ran, so rollback is intentionally a no-op.
+			     To undo manually: UPDATE cashier_bill SET location_id = NULL WHERE ... -->
+			<empty/>
+		</rollback>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-016-20260824-enforce-bill-location-not-null" author="goose">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<tableExists tableName="cashier_bill"/>
+				<columnExists tableName="cashier_bill" columnName="location_id"/>
+				<sqlCheck expectedResult="0">SELECT COUNT(*) FROM cashier_bill WHERE location_id IS NULL</sqlCheck>
+			</and>
+		</preConditions>
+		<comment>Staged NOT NULL enforcement: only applied once every bill row has been assigned a location (e.g. after running the backfill). MARK_RAN keeps older installs booting.</comment>
+		<addNotNullConstraint tableName="cashier_bill" columnName="location_id" columnDataType="int"/>
+		<rollback>
+			<dropNotNullConstraint tableName="cashier_bill" columnName="location_id" columnDataType="int"/>
+		</rollback>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-017-20260824-create-billable-service-group" author="goose">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<tableExists tableName="billing_billable_service_group"/>
+			</not>
+		</preConditions>
+		<comment>Create per-location billable service groups.</comment>
+		<createTable tableName="billing_billable_service_group">
+			<column name="billable_service_group_id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="name" type="varchar(255)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="description" type="varchar(1024)"/>
+			<column name="location_id" type="int"/>
+			<column name="creator" type="int">
+				<constraints nullable="false"/>
+			</column>
+			<column name="date_created" type="datetime">
+				<constraints nullable="false"/>
+			</column>
+			<column name="changed_by" type="int"/>
+			<column name="date_changed" type="datetime"/>
+			<column name="retired" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="retired_by" type="int"/>
+			<column name="date_retired" type="datetime"/>
+			<column name="retire_reason" type="varchar(255)"/>
+			<column name="uuid" type="char(38)">
+				<constraints nullable="false" unique="true"/>
+			</column>
+		</createTable>
+
+		<addForeignKeyConstraint constraintName="billing_bsg_location_fk"
+		                         baseTableName="billing_billable_service_group" baseColumnNames="location_id"
+		                         referencedTableName="location" referencedColumnNames="location_id"/>
+		<addForeignKeyConstraint constraintName="billing_bsg_creator_fk"
+		                         baseTableName="billing_billable_service_group" baseColumnNames="creator"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="billing_bsg_changed_by_fk"
+		                         baseTableName="billing_billable_service_group" baseColumnNames="changed_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="billing_bsg_retired_by_fk"
+		                         baseTableName="billing_billable_service_group" baseColumnNames="retired_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+
+		<createIndex indexName="billing_bsg_location_name_idx" tableName="billing_billable_service_group">
+			<column name="location_id"/>
+			<column name="name"/>
+			<column name="retired"/>
+		</createIndex>
+
+		<rollback>
+			<dropTable tableName="billing_billable_service_group"/>
+		</rollback>
+	</changeSet>
+
+	<changeSet id="openmrs.billing-018-20260824-create-location-billable-service" author="goose">
+		<preConditions onFail="MARK_RAN">
+			<and>
+				<not>
+					<tableExists tableName="billing_location_billable_service"/>
+				</not>
+				<tableExists tableName="cashier_billable_service"/>
+			</and>
+		</preConditions>
+		<comment>Create the per-location billable service mapping table with price overrides, enabled flag, display order and full audit columns.</comment>
+		<createTable tableName="billing_location_billable_service">
+			<column name="location_billable_service_id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false"/>
+			</column>
+			<column name="location_id" type="int">
+				<constraints nullable="false"/>
+			</column>
+			<column name="billable_service_id" type="int">
+				<constraints nullable="false"/>
+			</column>
+			<column name="service_group_id" type="int"/>
+			<column name="price_override" type="decimal(10,2)"/>
+			<column name="enabled" type="boolean" defaultValueBoolean="true">
+				<constraints nullable="false"/>
+			</column>
+			<column name="display_order" type="int" defaultValueNumeric="0">
+				<constraints nullable="false"/>
+			</column>
+			<column name="creator" type="int">
+				<constraints nullable="false"/>
+			</column>
+			<column name="date_created" type="datetime">
+				<constraints nullable="false"/>
+			</column>
+			<column name="changed_by" type="int"/>
+			<column name="date_changed" type="datetime"/>
+			<column name="voided" type="boolean" defaultValueBoolean="false">
+				<constraints nullable="false"/>
+			</column>
+			<column name="voided_by" type="int"/>
+			<column name="date_voided" type="datetime"/>
+			<column name="void_reason" type="varchar(255)"/>
+			<column name="uuid" type="char(38)">
+				<constraints nullable="false" unique="true"/>
+			</column>
+		</createTable>
+
+		<addUniqueConstraint constraintName="uq_billing_loc_service"
+		                     tableName="billing_location_billable_service"
+		                     columnNames="location_id, billable_service_id"/>
+
+		<addForeignKeyConstraint constraintName="billing_lbs_location_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="location_id"
+		                         referencedTableName="location" referencedColumnNames="location_id"/>
+		<addForeignKeyConstraint constraintName="billing_lbs_billable_service_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="billable_service_id"
+		                         referencedTableName="cashier_billable_service" referencedColumnNames="service_id"/>
+		<addForeignKeyConstraint constraintName="billing_lbs_service_group_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="service_group_id"
+		                         referencedTableName="billing_billable_service_group" referencedColumnNames="billable_service_group_id"/>
+		<addForeignKeyConstraint constraintName="billing_lbs_creator_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="creator"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="billing_lbs_changed_by_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="changed_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+		<addForeignKeyConstraint constraintName="billing_lbs_voided_by_fk"
+		                         baseTableName="billing_location_billable_service" baseColumnNames="voided_by"
+		                         referencedTableName="users" referencedColumnNames="user_id"/>
+
+		<!-- Both directions: by location (service picker) and by service (which locations offer it) -->
+		<createIndex indexName="billing_lbs_location_enabled_idx" tableName="billing_location_billable_service">
+			<column name="location_id"/>
+			<column name="enabled"/>
+			<column name="voided"/>
+		</createIndex>
+		<createIndex indexName="billing_lbs_service_idx" tableName="billing_location_billable_service">
+			<column name="billable_service_id"/>
+		</createIndex>
+
+		<rollback>
+			<dropTable tableName="billing_location_billable_service"/>
+		</rollback>
+	</changeSet>
+
 </databaseChangeLog>

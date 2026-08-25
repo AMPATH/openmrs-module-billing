@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.openmrs.Location;
 import org.openmrs.Provider;
 import org.openmrs.Visit;
 import org.openmrs.api.AdministrationService;
@@ -74,6 +75,7 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 			description.addProperty("adjustedBy", Representation.REF);
 			description.addProperty("billAdjusted", Representation.REF);
 			description.addProperty("cashPoint", Representation.REF);
+			description.addProperty("location", Representation.REF);
 			description.addProperty("visit", Representation.REF);
 			description.addProperty("cashier", Representation.REF);
 			description.addProperty("dateCreated");
@@ -102,6 +104,7 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		description.addProperty("adjustedBy");
 		description.addProperty("billAdjusted");
 		description.addProperty("cashPoint");
+		description.addProperty("location");
 		description.addProperty("visit");
 		description.addProperty("cashier");
 		description.addProperty("lineItems");
@@ -205,6 +208,10 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 				assignActiveVisit(bill);
 			}
 			
+			if (bill.getLocation() == null) {
+				assignDefaultLocation(bill);
+			}
+			
 			initializeBillStatus(bill);
 		}
 		
@@ -281,6 +288,28 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		    activeVisits.size());
 	}
 	
+	/**
+	 * Location defaulting: session location first, then the billing.defaultLocationUuid global
+	 * property. Never overwrites an explicitly supplied location.
+	 */
+	private void assignDefaultLocation(Bill bill) {
+		if (Context.getUserContext() != null && Context.getUserContext().getLocation() != null) {
+			bill.setLocation(Context.getUserContext().getLocation());
+			return;
+		}
+		
+		String defaultLocationUuid = Context.getAdministrationService()
+		        .getGlobalProperty(ModuleSettings.DEFAULT_LOCATION_UUID);
+		if (StringUtils.isNotBlank(defaultLocationUuid)) {
+			Location defaultLocation = Context.getLocationService().getLocationByUuid(defaultLocationUuid);
+			if (defaultLocation != null) {
+				bill.setLocation(defaultLocation);
+			} else {
+				log.warn("Global property {} is set but does not match any location", ModuleSettings.DEFAULT_LOCATION_UUID);
+			}
+		}
+	}
+	
 	private void initializeBillStatus(Bill bill) {
 		// Now that all attributes have been set (i.e., payments and bill status) we can check to see if the bill
 		// is fully paid.
@@ -349,6 +378,11 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		String visitUuid = context.getRequest().getParameter("visitUuid");
 		if (StringUtils.isNotBlank(visitUuid)) {
 			billSearch.setVisitUuid(visitUuid);
+		}
+		
+		String locationUuid = context.getRequest().getParameter("location");
+		if (StringUtils.isNotBlank(locationUuid)) {
+			billSearch.setLocationUuid(locationUuid);
 		}
 		
 		String discountStatus = context.getRequest().getParameter("discountStatus");

@@ -15,6 +15,11 @@
 		"http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
 <hibernate-mapping package="org.openmrs.module.billing.api.model">
 
+	<!-- Location partitioning: enabled per-session by BillingLocationScope when the global property
+	     billing.enforceLocationScope is true. Applies to every query on the filtered entities and
+	     collections (never to direct id loads or writes). -->
+	<filter-def name="billingLocationFilter" condition="location_id = :locationId"/>
+
 	<class name="org.openmrs.module.billing.api.model.CashierItemPrice" table="cashier_item_price">
 		<cache usage="read-write"/>
 		<id name="id" type="int" column="item_price_id">
@@ -116,6 +121,8 @@
 		<many-to-one name="patient" class="org.openmrs.Patient" not-null="true" column="patient_id"/>
 		<many-to-one name="cashPoint" class="org.openmrs.module.billing.api.model.CashPoint" not-null="true"
 		             column="cash_point_id"/>
+		<many-to-one name="location" class="org.openmrs.Location" column="location_id"
+		             index="cashier_bill_location_id_idx"/>
 		<many-to-one name="visit" class="org.openmrs.Visit" column="visit_id" index="cashier_bill_visit_id_idx"/>
 		<many-to-one name="billAdjusted" class="org.openmrs.module.billing.api.model.Bill" column="adjusted_bill_id"/>
 
@@ -140,6 +147,7 @@
 		<set name="adjustedBy" lazy="true" inverse="true">
 			<key column="adjusted_bill_id"/>
 			<one-to-many class="org.openmrs.module.billing.api.model.Bill"/>
+			<filter name="billingLocationFilter"/>
 		</set>
 
 		<property name="receiptPrinted" column="receipt_printed" type="java.lang.Boolean" length="1" not-null="true"/>
@@ -160,6 +168,10 @@
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
 		<property name="adjustmentReason" type="java.lang.String" column="adjustment_reason" length="500"
 		          not-null="false"/>
+
+		<!-- Location scoping: applies to HQL/Criteria queries and lazy collections (adjustedBy).
+		     Direct loads by id/uuid are intentionally NOT filtered. -->
+		<filter name="billingLocationFilter"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.BillLineItem" table="cashier_bill_line_item">
@@ -323,5 +335,75 @@
 		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
 		<property name="retired" type="boolean" column="retired" length="1" not-null="true"/>
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+	</class>
+
+	<class name="org.openmrs.module.billing.api.model.BillableServiceGroup" table="billing_billable_service_group">
+		<cache usage="read-write"/>
+
+		<id name="id" type="int" column="billable_service_group_id">
+			<generator class="native">
+				<param name="sequence">billing_billable_service_group_id_seq</param>
+			</generator>
+		</id>
+		<discriminator column="billable_service_group_id" insert="false"/>
+
+		<many-to-one name="location" class="org.openmrs.Location" not-null="false" column="location_id"/>
+
+		<property name="name" type="java.lang.String" column="name" not-null="true" length="255"/>
+		<property name="description" type="java.lang.String" column="description" length="1024"/>
+
+		<!-- BaseOpenmrsMetadata fields -->
+		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
+		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
+
+		<many-to-one name="changedBy" class="org.openmrs.User" column="changed_by"/>
+		<property name="dateChanged" type="java.util.Date" column="date_changed" length="19"/>
+
+		<many-to-one name="retiredBy" class="org.openmrs.User" column="retired_by"/>
+		<property name="dateRetired" type="java.util.Date" column="date_retired" length="19"/>
+		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
+		<property name="retired" type="boolean" column="retired" length="1" not-null="true"/>
+		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+	</class>
+
+	<class name="org.openmrs.module.billing.api.model.LocationBillableService"
+	       table="billing_location_billable_service">
+		<cache usage="read-write"/>
+
+		<id name="id" type="int" column="location_billable_service_id">
+			<generator class="native">
+				<param name="sequence">billing_location_billable_service_id_seq</param>
+			</generator>
+		</id>
+		<discriminator column="location_billable_service_id" insert="false"/>
+
+		<many-to-one name="location" class="org.openmrs.Location" not-null="false" column="location_id"/>
+		<many-to-one name="billableService" class="org.openmrs.module.billing.api.model.BillableService"
+		             not-null="false" column="billable_service_id"/>
+		<many-to-one name="serviceGroup" class="org.openmrs.module.billing.api.model.BillableServiceGroup"
+		             not-null="false" column="service_group_id"/>
+
+		<property name="priceOverride" type="java.math.BigDecimal" column="price_override" not-null="false"
+		          precision="10" scale="2"/>
+		<property name="enabled" type="java.lang.Boolean" column="enabled" length="1" not-null="true"/>
+		<property name="displayOrder" type="int" column="display_order" not-null="true"/>
+
+		<!-- BaseOpenmrsData fields -->
+		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
+		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
+
+		<many-to-one name="changedBy" class="org.openmrs.User" column="changed_by"/>
+		<property name="dateChanged" type="java.util.Date" column="date_changed" length="19"/>
+
+		<property name="voided" type="java.lang.Boolean" column="voided" length="1" not-null="true"/>
+		<many-to-one name="voidedBy" class="org.openmrs.User" column="voided_by"/>
+
+		<property name="dateVoided" type="java.util.Date" column="date_voided" length="19"/>
+		<property name="voidReason" type="java.lang.String" column="void_reason" length="255"/>
+
+		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+
+		<!-- Location scoping for per-location service mappings -->
+		<filter name="billingLocationFilter"/>
 	</class>
 </hibernate-mapping>

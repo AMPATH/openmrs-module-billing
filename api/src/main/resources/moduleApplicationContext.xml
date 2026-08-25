@@ -128,6 +128,14 @@
 			</list>
 		</property>
 	</bean>
+	<bean parent="serviceContext">
+		<property name="moduleService">
+			<list merge="true">
+				<value>org.openmrs.module.billing.api.LocationBillableServiceService</value>
+				<ref bean="locationBillableServiceService"/>
+			</list>
+		</property>
+	</bean>
 
 	<!-- Service Bean Definitions -->
 	<bean id="itemPriceService" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
@@ -296,6 +304,19 @@
 		  class="org.openmrs.module.billing.api.db.hibernate.HibernateBillRefundDAO">
 		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
 	</bean>
+	<bean id="locationBillableServiceService"
+	      class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+		<property name="transactionManager" ref="transactionManager"/>
+		<property name="target">
+			<bean class="org.openmrs.module.billing.api.impl.LocationBillableServiceServiceImpl">
+				<property name="locationBillableServiceDAO" ref="locationBillableServiceDAO"/>
+				<property name="billableServiceGroupDAO" ref="billableServiceGroupDAO"/>
+				<property name="itemPriceService" ref="itemPriceService"/>
+			</bean>
+		</property>
+		<property name="preInterceptors" ref="serviceInterceptors"/>
+		<property name="transactionAttributeSource" ref="transactionAttributeSource"/>
+	</bean>
 	<bean id="billableServiceDAO"
 		  class="org.openmrs.module.billing.api.db.hibernate.HibernateBillableServiceDAOImpl">
 		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
@@ -310,6 +331,14 @@
 	</bean>
 	<bean id="cashierItemPriceDAO"
 		  class="org.openmrs.module.billing.api.db.hibernate.HibernateCashierItemPriceDAOImpl">
+		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
+	</bean>
+	<bean id="locationBillableServiceDAO"
+	      class="org.openmrs.module.billing.api.db.hibernate.HibernateLocationBillableServiceDAOImpl">
+		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
+	</bean>
+	<bean id="billableServiceGroupDAO"
+	      class="org.openmrs.module.billing.api.db.hibernate.HibernateBillableServiceGroupDAOImpl">
 		<constructor-arg name="sessionFactory" ref="sessionFactory"/>
 	</bean>
 

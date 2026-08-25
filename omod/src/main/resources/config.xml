@@ -193,6 +193,19 @@
 		</description>
 	</globalProperty>
 
+	<globalProperty>
+		<property>${project.parent.artifactId}.defaultLocationUuid</property>
+		<description>UUID of the location used to backfill location on existing bills and to default
+			the location of newly created bills when none is supplied.</description>
+	</globalProperty>
+
+	<globalProperty>
+		<property>${project.parent.artifactId}.enforceLocationScope</property>
+		<description>true/false. When true, billing queries are automatically restricted to the session
+			location (Context.getLocation()). Defaults to false for backward compatibility.</description>
+		<defaultValue>false</defaultValue>
+	</globalProperty>
+
 
 	<!-- Extensions -->
 	<!--	<extension>-->

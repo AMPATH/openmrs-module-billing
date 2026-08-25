@@ -24,6 +24,8 @@ import org.openmrs.module.billing.api.model.Bill;
 import org.openmrs.module.billing.api.model.BillDiscount;
 import org.openmrs.module.billing.api.model.BillRefund;
 import org.openmrs.module.billing.api.search.BillSearch;
+import org.openmrs.module.billing.api.util.BillingLocationScope;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.annotation.Nonnull;
 import javax.persistence.TypedQuery;
@@ -43,7 +45,6 @@ import static org.openmrs.module.billing.api.db.hibernate.PagingUtil.applyPaging
  * @see BillDAO
  * @see Bill
  */
-@AllArgsConstructor
 public class HibernateBillDAO implements BillDAO {
 	
 	private static final String FIELD_STATUS = "status";
@@ -52,6 +53,18 @@ public class HibernateBillDAO implements BillDAO {
 	
 	@Setter(AccessLevel.PROTECTED)
 	private SessionFactory sessionFactory;
+	
+	/**
+	 * Applies the billingLocationFilter to the current session before queries when
+	 * billing.enforceLocationScope is on. Never affects direct id/uuid loads or writes.
+	 */
+	@Autowired(required = false)
+	@Setter(AccessLevel.PROTECTED)
+	private BillingLocationScope locationScope;
+	
+	public HibernateBillDAO(SessionFactory sessionFactory) {
+		this.sessionFactory = sessionFactory;
+	}
 	
 	/**
 	 * {@inheritDoc}
@@ -88,6 +101,9 @@ public class HibernateBillDAO implements BillDAO {
 	 */
 	@Override
 	public List<Bill> getBillsByPatientUuid(@Nonnull String patientUuid, PagingInfo pagingInfo) {
+		if (locationScope != null) {
+			locationScope.apply();
+		}
 		Session session = sessionFactory.getCurrentSession();
 		
 		CriteriaBuilder cb = session.getCriteriaBuilder();
@@ -112,6 +128,9 @@ public class HibernateBillDAO implements BillDAO {
 	 */
 	@Override
 	public List<Bill> getBills(@Nonnull BillSearch billSearch, PagingInfo pagingInfo) {
+		if (locationScope != null) {
+			locationScope.apply();
+		}
 		Session session = sessionFactory.getCurrentSession();
 		
 		CriteriaBuilder cb = session.getCriteriaBuilder();
@@ -171,6 +190,10 @@ public class HibernateBillDAO implements BillDAO {
 		
 		if (billSearch.getVisitUuid() != null) {
 			predicates.add(cb.equal(root.get("visit").get("uuid"), billSearch.getVisitUuid()));
+		}
+		
+		if (StringUtils.isNotEmpty(billSearch.getLocationUuid())) {
+			predicates.add(cb.equal(root.get("location").get("uuid"), billSearch.getLocationUuid()));
 		}
 		
 		if (billSearch.getStatuses() != null && !billSearch.getStatuses().isEmpty()) {
