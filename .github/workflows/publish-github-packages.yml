@@ -37,5 +37,5 @@ jobs:
       - name: Publish package
         run: mvn --batch-mode deploy -Pgithub-packages -DskipTests
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.AMPATH_GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
