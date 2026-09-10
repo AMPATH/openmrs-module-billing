@@ -12,6 +12,9 @@ package org.openmrs.module.billing.api.billing.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -29,9 +32,11 @@ import org.openmrs.Drug;
 import org.openmrs.DrugOrder;
 import org.openmrs.TestOrder;
 import org.openmrs.module.billing.api.BillExemptionService;
+import org.openmrs.module.billing.api.BillableDrugService;
 import org.openmrs.module.billing.api.ItemPriceService;
 import org.openmrs.module.billing.api.model.BillLineItem;
 import org.openmrs.module.billing.api.model.BillLineItemStatus;
+import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.stockmanagement.api.StockManagementService;
 import org.openmrs.module.stockmanagement.api.model.StockItem;
@@ -48,6 +53,9 @@ public class DrugOrderBillingStrategyTest {
 	@Mock
 	private BillExemptionService billExemptionService;
 	
+	@Mock
+	private BillableDrugService billableDrugService;
+	
 	@InjectMocks
 	private DrugOrderBillingStrategy strategy;
 	
@@ -61,6 +69,7 @@ public class DrugOrderBillingStrategyTest {
 	public void setup() {
 		drug = new Drug();
 		drug.setDrugId(1);
+		drug.setUuid("drug-uuid-1");
 		drug.setConcept(new Concept());
 		
 		drugOrder = new DrugOrder();
@@ -71,6 +80,8 @@ public class DrugOrderBillingStrategyTest {
 		stockItem = new StockItem();
 		stockItem.setUuid("test-stock-item-uuid");
 		stockItem.setPurchasePrice(new BigDecimal("100.00"));
+		
+		lenient().when(billableDrugService.getBillableDrugs(any(), isNull())).thenReturn(Collections.emptyList());
 	}
 	
 	@Test
@@ -99,6 +110,24 @@ public class DrugOrderBillingStrategyTest {
 		assertEquals(5, lineItem.getQuantity());
 		assertEquals(BillLineItemStatus.PENDING, lineItem.getStatus());
 		assertEquals(stockItem, lineItem.getItem());
+	}
+	
+	@Test
+	public void createBillLineItem_shouldPreferBillableDrugOverStockItem() {
+		BillableDrug billableDrug = new BillableDrug();
+		billableDrug.setName("Paracetamol 500mg");
+		billableDrug.setDrug(drug);
+		CashierItemPrice drugPrice = new CashierItemPrice();
+		drugPrice.setPrice(new BigDecimal("75.00"));
+		
+		when(billableDrugService.getBillableDrugs(any(), isNull())).thenReturn(Collections.singletonList(billableDrug));
+		when(itemPriceService.getDrugPrice(billableDrug)).thenReturn(Collections.singletonList(drugPrice));
+		
+		Optional<BillLineItem> result = strategy.createBillLineItem(drugOrder);
+		
+		assertTrue(result.isPresent());
+		assertEquals(billableDrug, result.get().getBillableDrug());
+		assertEquals(new BigDecimal("75.00"), result.get().getPrice());
 	}
 	
 	@Test

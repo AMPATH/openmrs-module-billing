@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.openmrs.DrugOrder;
 import org.openmrs.Location;
 import org.openmrs.Order;
 import org.openmrs.Provider;
@@ -30,14 +31,15 @@ import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.billing.api.model.ExemptionType;
 import org.openmrs.module.billing.api.search.BillableServiceSearch;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.Ordered;
 
 /**
- * Default billing strategy for {@link TestOrder}s. Creates a bill line item based on the billable
- * service linked to the test order's concept, preferring location-specific catalog entries.
+ * Bills non-drug, non-test orders by mapping the order concept to a location-scoped
+ * {@link BillableService}.
  */
 @Slf4j
 @Setter(onMethod_ = @Autowired)
-public class TestOrderBillingStrategy extends AbstractDefaultOrderBillingStrategy {
+public class ConceptOrderBillingStrategy extends AbstractDefaultOrderBillingStrategy {
 	
 	private BillableServiceService billableServiceService;
 	
@@ -45,21 +47,20 @@ public class TestOrderBillingStrategy extends AbstractDefaultOrderBillingStrateg
 	
 	@Override
 	protected boolean supportsOrder(Order order) {
-		return order instanceof TestOrder;
+		return !(order instanceof DrugOrder) && !(order instanceof TestOrder) && order.getConcept() != null;
+	}
+	
+	@Override
+	public int getOrder() {
+		// After drug and test strategies
+		return Ordered.LOWEST_PRECEDENCE;
 	}
 	
 	@Override
 	protected Optional<BillLineItem> createBillLineItem(Order order) {
-		TestOrder testOrder = (TestOrder) order;
-		
-		if (testOrder.getConcept() == null) {
-			log.warn("TestOrder {} has no concept set, cannot generate bill", order.getUuid());
-			return Optional.empty();
-		}
-		
 		Location location = resolveEncounterLocation(order);
 		BillableServiceSearch searchTemplate = new BillableServiceSearch();
-		searchTemplate.setConceptUuid(testOrder.getConcept().getUuid());
+		searchTemplate.setConceptUuid(order.getConcept().getUuid());
 		searchTemplate.setServiceStatus(BillableServiceStatus.ENABLED);
 		if (location != null) {
 			searchTemplate.setLocationUuid(location.getUuid());
@@ -69,7 +70,7 @@ public class TestOrderBillingStrategy extends AbstractDefaultOrderBillingStrateg
 		List<BillableService> searchResult = billableServiceService.getBillableServices(searchTemplate, null);
 		BillableService billableService = preferLocationSpecific(searchResult, location);
 		if (billableService == null) {
-			log.debug("No billable service found for concept: {}", testOrder.getConcept().getUuid());
+			log.debug("No billable service found for concept: {}", order.getConcept().getUuid());
 			return Optional.empty();
 		}
 		

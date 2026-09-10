@@ -257,37 +257,112 @@ public class Bill extends BaseOpenmrsData {
 		        || current == BillStatus.PARTIALLY_REFUNDED) {
 			return;
 		}
-		if (this.getPayments() != null && !this.getPayments().isEmpty()
-		        && getTotalPayments().compareTo(BigDecimal.ZERO) > 0) {
-			// Approved discount exceeds the current bill total — likely a line item was voided
-			// after approval. Stay POSTED so a human can void/reapply rather than letting any
-			// non-zero payment silently flip the bill to PAID.
-			if (hasDiscountDrift()) {
-				log.warn("Bill {} has discount drift (total={}, effectiveTotal={}); staying POSTED for manual review",
-				    getUuid(), getTotal(), effectiveTotal());
-				this.setStatus(BillStatus.POSTED);
-				return;
-			}
-			boolean billFullySettled = getTotalPayments().compareTo(getAmountAfterDiscount()) >= 0;
-			if (billFullySettled) {
-				this.setStatus(BillStatus.PAID);
-				// Update all non-voided and non-refunded status bill line items to PAID status
-				if (this.lineItems != null) {
-					for (BillLineItem lineItem : this.lineItems) {
-						if (lineItem != null && !lineItem.getVoided() && !isRefundStatus(lineItem.getStatus())) {
-							lineItem.setStatus(BillLineItemStatus.PAID);
-						}
+		if (this.getPayments() == null || this.getPayments().isEmpty()
+		        || getTotalPayments().compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		if (hasDiscountDrift()) {
+			log.warn("Bill {} has discount drift (total={}, effectiveTotal={}); staying POSTED for manual review", getUuid(),
+			    getTotal(), effectiveTotal());
+			this.setStatus(BillStatus.POSTED);
+			return;
+		}
+		
+		if (hasLineItemAllocations()) {
+			synchronizeStatusFromLineAllocations();
+			return;
+		}
+		
+		boolean billFullySettled = getTotalPayments().compareTo(getAmountAfterDiscount()) >= 0;
+		if (billFullySettled) {
+			this.setStatus(BillStatus.PAID);
+			if (this.lineItems != null) {
+				for (BillLineItem lineItem : this.lineItems) {
+					if (lineItem != null && !lineItem.getVoided() && !isRefundStatus(lineItem.getStatus())) {
+						lineItem.setStatus(BillLineItemStatus.PAID);
 					}
 				}
-			} else {
-				this.setStatus(BillStatus.POSTED);
+			}
+		} else {
+			this.setStatus(BillStatus.POSTED);
+		}
+	}
+	
+	private boolean hasLineItemAllocations() {
+		if (payments == null) {
+			return false;
+		}
+		for (Payment payment : payments) {
+			if (payment == null || payment.getVoided()) {
+				continue;
+			}
+			if (payment.getLineItemAllocations() != null) {
+				for (PaymentLineItemAllocation allocation : payment.getLineItemAllocations()) {
+					if (allocation != null && !allocation.getVoided()) {
+						return true;
+					}
+				}
 			}
 		}
+		return false;
+	}
+	
+	private void synchronizeStatusFromLineAllocations() {
+		boolean allPayableLinesPaid = true;
+		if (lineItems != null) {
+			for (BillLineItem lineItem : lineItems) {
+				if (lineItem == null || lineItem.getVoided()) {
+					continue;
+				}
+				if (lineItem.getStatus() == BillLineItemStatus.EXEMPTED || isRefundStatus(lineItem.getStatus())) {
+					continue;
+				}
+				BigDecimal allocated = getAllocatedAmountForLineItem(lineItem);
+				if (allocated.compareTo(lineItem.getTotal()) >= 0) {
+					lineItem.setStatus(BillLineItemStatus.PAID);
+				} else {
+					allPayableLinesPaid = false;
+					if (lineItem.getStatus() != BillLineItemStatus.PAID) {
+						lineItem.setStatus(BillLineItemStatus.PENDING);
+					}
+				}
+			}
+		}
+		this.setStatus(allPayableLinesPaid ? BillStatus.PAID : BillStatus.POSTED);
+	}
+	
+	/**
+	 * Sum of non-voided payment allocations targeting the given line item.
+	 */
+	public BigDecimal getAllocatedAmountForLineItem(BillLineItem lineItem) {
+		BigDecimal total = BigDecimal.ZERO;
+		if (payments == null || lineItem == null) {
+			return total;
+		}
+		for (Payment payment : payments) {
+			if (payment == null || payment.getVoided() || payment.getLineItemAllocations() == null) {
+				continue;
+			}
+			for (PaymentLineItemAllocation allocation : payment.getLineItemAllocations()) {
+				if (allocation == null || allocation.getVoided() || allocation.getBillLineItem() == null) {
+					continue;
+				}
+				if (lineItem.equals(allocation.getBillLineItem())
+				        || (lineItem.getUuid() != null && lineItem.getUuid().equals(allocation.getBillLineItem().getUuid()))
+				        || (lineItem.getId() != null && lineItem.getId().equals(allocation.getBillLineItem().getId()))) {
+					if (allocation.getAmount() != null) {
+						total = total.add(allocation.getAmount());
+					}
+				}
+			}
+		}
+		return total;
 	}
 	
 	public void removePayment(Payment payment) {
 		if (payment != null && this.payments != null) {
 			this.payments.remove(payment);
+			this.synchronizeBillStatus();
 		}
 	}
 	
@@ -309,6 +384,14 @@ public class Bill extends BaseOpenmrsData {
 		if (!Context.hasPrivilege(PrivilegeConstants.ADJUST_BILLS)) {
 			throw new AccessControlException("Access denied to adjust bill.");
 		}
+	}
+	
+	/**
+	 * Bills in PENDING or POSTED may still receive new line items (visit consolidation) and payments.
+	 */
+	public boolean acceptsNewLineItems() {
+		return getStatus() == null || this.getId() == null || this.getStatus() == BillStatus.PENDING
+		        || this.getStatus() == BillStatus.POSTED;
 	}
 	
 	/**

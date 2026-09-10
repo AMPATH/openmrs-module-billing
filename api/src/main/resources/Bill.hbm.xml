@@ -28,6 +28,8 @@
 		             column="item_id"/>
 		<many-to-one name="billableService" class="org.openmrs.module.billing.api.model.BillableService"
 		             not-null="false" column="service_id"/>
+		<many-to-one name="billableDrug" class="org.openmrs.module.billing.api.model.BillableDrug"
+		             not-null="false" column="billable_drug_id"/>
 		<many-to-one name="paymentMode" class="org.openmrs.module.billing.api.model.PaymentMode" not-null="false"
 		             column="payment_mode"/>
 
@@ -65,6 +67,7 @@
 
 		<many-to-one name="serviceType" class="org.openmrs.Concept" not-null="false" column="service_type"/>
 		<many-to-one name="serviceCategory" class="org.openmrs.Concept" not-null="false" column="service_category"/>
+		<many-to-one name="location" class="org.openmrs.Location" not-null="false" column="location_id"/>
 
 		<bag name="servicePrices" lazy="false" inverse="true" cascade="all-delete-orphan">
 			<key column="service_id"/>
@@ -78,6 +81,46 @@
 			</type>
 		</property>
 		<!-- bi-directional many-to-one association to User -->
+		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
+		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
+
+		<many-to-one name="changedBy" class="org.openmrs.User" column="changed_by"/>
+		<property name="dateChanged" type="java.util.Date" column="date_changed" length="19"/>
+
+		<property name="retired" type="java.lang.Boolean" column="retired" length="1" not-null="true"/>
+		<many-to-one name="retiredBy" class="org.openmrs.User" column="retired_by"/>
+		<property name="dateRetired" type="java.util.Date" column="date_retired" length="19"/>
+		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
+
+		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+	</class>
+
+	<class name="org.openmrs.module.billing.api.model.BillableDrug" table="cashier_billable_drug">
+		<cache usage="read-write"/>
+
+		<id name="id" type="int" column="billable_drug_id">
+			<generator class="native">
+				<param name="sequence">cashier_billable_drug_id_seq</param>
+			</generator>
+		</id>
+		<discriminator column="billable_drug_id" insert="false"/>
+
+		<property name="name" type="java.lang.String" column="name" not-null="true" length="255"/>
+		<property name="shortName" type="java.lang.String" column="short_name" length="255"/>
+		<many-to-one name="drug" class="org.openmrs.Drug" not-null="false" column="drug_id"/>
+		<many-to-one name="location" class="org.openmrs.Location" not-null="false" column="location_id"/>
+
+		<bag name="drugPrices" lazy="false" inverse="true" cascade="all-delete-orphan">
+			<key column="billable_drug_id"/>
+			<one-to-many class="org.openmrs.module.billing.api.model.CashierItemPrice"/>
+		</bag>
+
+		<property name="status" column="status" not-null="true">
+			<type name="org.hibernate.type.EnumType">
+				<param name="enumClass">org.openmrs.module.billing.api.model.BillableDrugStatus</param>
+				<param name="type">12</param>
+			</type>
+		</property>
 		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
 		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
 
@@ -177,12 +220,15 @@
 		             not-null="false"/>
 		<many-to-one name="billableService" class="org.openmrs.module.billing.api.model.BillableService"
 		             column="service_id" not-null="false"/>
+		<many-to-one name="billableDrug" class="org.openmrs.module.billing.api.model.BillableDrug"
+		             column="billable_drug_id" not-null="false"/>
 		<many-to-one name="itemPrice" class="org.openmrs.module.billing.api.model.CashierItemPrice" column="price_id"/>
 		<many-to-one name="order" class="org.openmrs.Order" column="order_id" not-null="false"/>
 		<property name="price" type="java.math.BigDecimal" column="price" not-null="true"/>
 		<property name="priceName" type="java.lang.String" column="price_name" length="255"/>
 		<property name="quantity" type="int" column="quantity" not-null="true"/>
 		<property name="lineItemOrder" type="int" column="line_item_order"/>
+		<property name="batchNumber" type="java.lang.String" column="batch_number" length="255"/>
 		<property name="status" column="status" not-null="true">
 			<type name="org.hibernate.type.EnumType">
 				<param name="enumClass">org.openmrs.module.billing.api.model.BillLineItemStatus</param>
@@ -228,7 +274,39 @@
 			<one-to-many class="org.openmrs.module.billing.api.model.PaymentAttribute"/>
 		</set>
 
+		<set name="lineItemAllocations" lazy="false" inverse="true" cascade="all-delete-orphan">
+			<key column="bill_payment_id"/>
+			<one-to-many class="org.openmrs.module.billing.api.model.PaymentLineItemAllocation"/>
+		</set>
+
 		<!-- BaseOpenmrsData Fields-->
+		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
+		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
+		<many-to-one name="changedBy" class="org.openmrs.User" column="changed_by"/>
+		<property name="dateChanged" type="java.util.Date" column="date_changed" length="19"/>
+		<property name="voided" type="java.lang.Boolean" column="voided" length="1" not-null="true"/>
+		<many-to-one name="voidedBy" class="org.openmrs.User" column="voided_by"/>
+		<property name="dateVoided" type="java.util.Date" column="date_voided" length="19"/>
+		<property name="voidReason" type="java.lang.String" column="void_reason" length="255"/>
+		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+	</class>
+
+	<class name="org.openmrs.module.billing.api.model.PaymentLineItemAllocation" table="cashier_bill_payment_line_item">
+		<cache usage="read-write"/>
+
+		<id name="id" type="int" column="payment_line_item_id">
+			<generator class="native">
+				<param name="sequence">cashier_bill_payment_line_item_id_seq</param>
+			</generator>
+		</id>
+		<discriminator column="payment_line_item_id" insert="false"/>
+
+		<many-to-one name="payment" class="org.openmrs.module.billing.api.model.Payment" column="bill_payment_id"
+		             not-null="true"/>
+		<many-to-one name="billLineItem" class="org.openmrs.module.billing.api.model.BillLineItem"
+		             column="bill_line_item_id" not-null="true"/>
+		<property name="amount" type="java.math.BigDecimal" column="amount" not-null="true"/>
+
 		<many-to-one name="creator" class="org.openmrs.User" not-null="true" column="creator"/>
 		<property name="dateCreated" type="java.util.Date" column="date_created" not-null="true" length="19"/>
 		<many-to-one name="changedBy" class="org.openmrs.User" column="changed_by"/>

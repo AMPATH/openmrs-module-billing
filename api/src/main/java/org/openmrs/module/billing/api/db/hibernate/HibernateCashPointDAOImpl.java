@@ -66,6 +66,20 @@ public class HibernateCashPointDAOImpl implements CashPointDAO {
 		
 		Root<CashPoint> root = criteriaQuery.from(CashPoint.class);
 		
+		List<Predicate> predicates = buildCashPointSearchPredicates(criteriaBuilder, root, cashPointSearch);
+		
+		criteriaQuery.where(predicates.toArray(new Predicate[0]));
+		
+		TypedQuery<CashPoint> typedQuery = session.createQuery(criteriaQuery);
+		PagingUtil.applyPaging(typedQuery, pagingInfo,
+		    (countCb, countQuery, countRoot) -> buildCashPointSearchPredicates(countCb, countRoot, cashPointSearch),
+		    sessionFactory, CashPoint.class);
+		
+		return typedQuery.getResultList();
+	}
+	
+	private List<Predicate> buildCashPointSearchPredicates(CriteriaBuilder criteriaBuilder, Root<CashPoint> root,
+	        CashPointSearch cashPointSearch) {
 		List<Predicate> predicates = new ArrayList<>();
 		
 		if (StringUtils.isNotEmpty(cashPointSearch.getLocationUuid())) {
@@ -81,12 +95,7 @@ public class HibernateCashPointDAOImpl implements CashPointDAO {
 			predicates.add(criteriaBuilder.equal(root.get("retired"), false));
 		}
 		
-		criteriaQuery.where(predicates.toArray(new Predicate[0]));
-		
-		TypedQuery<CashPoint> typedQuery = session.createQuery(criteriaQuery);
-		PagingUtil.applyPaging(typedQuery, pagingInfo, predicates, sessionFactory, CashPoint.class);
-		
-		return typedQuery.getResultList();
+		return predicates;
 	}
 	
 	/**

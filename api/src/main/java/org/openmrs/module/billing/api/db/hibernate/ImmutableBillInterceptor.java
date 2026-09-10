@@ -37,8 +37,8 @@ import java.io.Serializable;
 public class ImmutableBillInterceptor extends ImmutableEntityInterceptor {
 	
 	private static final String[] MUTABLE_PROPERTY_NAMES = new String[] { "changedBy", "dateChanged", "voided", "dateVoided",
-	        "voidedBy", "voidReason", "payment", "billAdjusted", "adjustmentReason", "adjustedBy", "receiptPrinted",
-	        "status", "receiptNumber" };
+	        "voidedBy", "voidReason", "payment", "payments", "lineItems", "billAdjusted", "adjustmentReason", "adjustedBy",
+	        "receiptPrinted", "status", "receiptNumber" };
 	
 	@Override
 	protected Class<?> getSupportedType() {

@@ -20,6 +20,9 @@ import lombok.Setter;
 import org.openmrs.Provider;
 import org.openmrs.module.billing.api.base.entity.model.BaseInstanceCustomizableData;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Model class that represents the {@link Bill} payment information.
  */
@@ -48,12 +51,27 @@ public class Payment extends BaseInstanceCustomizableData<PaymentMode, PaymentAt
 	@Setter
 	private Provider cashier;
 	
+	@Getter
+	@Setter
+	private Set<PaymentLineItemAllocation> lineItemAllocations;
+	
 	public Integer getId() {
 		return paymentId;
 	}
 	
 	public void setId(Integer id) {
 		paymentId = id;
+	}
+	
+	public void addLineItemAllocation(PaymentLineItemAllocation allocation) {
+		if (allocation == null) {
+			throw new NullPointerException("The allocation must be defined.");
+		}
+		if (this.lineItemAllocations == null) {
+			this.lineItemAllocations = new HashSet<>();
+		}
+		this.lineItemAllocations.add(allocation);
+		allocation.setPayment(this);
 	}
 	
 	public PaymentAttribute addAttribute(PaymentModeAttributeType type, String value) {

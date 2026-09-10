@@ -139,6 +139,8 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		for (BillLineItem item : instance.getLineItems()) {
 			item.setBill(instance);
 		}
+		// DB requires line_item_order; default any missing values after nested create via priceUuid
+		instance.recalculateLineItemOrder();
 	}
 	
 	@PropertySetter("payments")
@@ -349,6 +351,11 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		String visitUuid = context.getRequest().getParameter("visitUuid");
 		if (StringUtils.isNotBlank(visitUuid)) {
 			billSearch.setVisitUuid(visitUuid);
+		}
+		
+		String locationUuid = context.getRequest().getParameter("locationUuid");
+		if (StringUtils.isNotBlank(locationUuid)) {
+			billSearch.setLocationUuid(locationUuid);
 		}
 		
 		String discountStatus = context.getRequest().getParameter("discountStatus");

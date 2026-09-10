@@ -95,7 +95,7 @@ public abstract class AbstractOrderBillingStrategy implements OrderBillingStrate
 	}
 	
 	@Override
-	public CashPoint resolveCashPoint() {
+	public CashPoint resolveCashPoint(Order order) {
 		return null;
 	}
 }

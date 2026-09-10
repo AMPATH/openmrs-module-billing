@@ -49,6 +49,12 @@ public class ModuleSettings {
 	
 	public static final String REFUND_ENABLED = "billing.refundEnabled";
 	
+	/**
+	 * When true, Order CREATED events automatically create/update bills via billing strategies. Default
+	 * is false.
+	 */
+	public static final String AUTO_BILL_ON_ORDER_CREATE = "billing.autoBillOnOrderCreate";
+	
 	public static final String PATIENT_DASHBOARD_2_BILL_COUNT = "billing.patientDashboard2BillCount";
 	
 	private static final Integer DEFAULT_PATIENT_DASHBOARD_2_BILL_COUNT = 4;
@@ -76,6 +82,17 @@ public class ModuleSettings {
 	
 	public static Integer getReceiptReportId() {
 		return getIntProperty(RECEIPT_REPORT_ID_PROPERTY);
+	}
+	
+	/**
+	 * Whether order creation should automatically create or update bills.
+	 *
+	 * @return {@code true} only when the global property is explicitly {@code true}; missing/empty
+	 *         defaults to {@code false}
+	 */
+	public static boolean isAutoBillOnOrderCreateEnabled() {
+		Boolean enabled = getBoolProperty(AUTO_BILL_ON_ORDER_CREATE);
+		return Boolean.TRUE.equals(enabled);
 	}
 	
 	public static CashierSettings loadSettings() {

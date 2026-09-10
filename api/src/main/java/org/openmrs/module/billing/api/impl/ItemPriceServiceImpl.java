@@ -18,6 +18,7 @@ import org.hibernate.criterion.Restrictions;
 import org.openmrs.module.billing.api.ItemPriceService;
 import org.openmrs.module.billing.api.base.entity.impl.BaseMetadataDataServiceImpl;
 import org.openmrs.module.billing.api.base.entity.security.IMetadataAuthorizationPrivileges;
+import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.BillableService;
 import org.openmrs.module.billing.api.model.CashierItemPrice;
 import org.openmrs.module.stockmanagement.api.model.StockItem;
@@ -81,6 +82,14 @@ public class ItemPriceServiceImpl extends BaseMetadataDataServiceImpl<CashierIte
 		Criteria criteria = getRepository().createCriteria(CashierItemPrice.class);
 		
 		criteria.add(Restrictions.eq("billableService", billableService));
+		criteria.addOrder(Order.desc("id"));
+		return criteria.list();
+	}
+	
+	@Override
+	public List<CashierItemPrice> getDrugPrice(BillableDrug billableDrug) {
+		Criteria criteria = getRepository().createCriteria(CashierItemPrice.class);
+		criteria.add(Restrictions.eq("billableDrug", billableDrug));
 		criteria.addOrder(Order.desc("id"));
 		return criteria.list();
 	}

@@ -25,6 +25,7 @@ import org.openmrs.api.context.Context;
 import org.openmrs.api.context.Daemon;
 import org.openmrs.event.Event;
 import org.openmrs.module.DaemonToken;
+import org.openmrs.module.billing.ModuleSettings;
 
 /**
  * Listens for Order CREATED events from the OpenMRS Event module and delegates billing to the
@@ -88,6 +89,11 @@ public class OrderBillingEventListener implements BillingEventListener {
 	 * @param order a persisted order
 	 */
 	void processOrder(Order order) {
+		if (!ModuleSettings.isAutoBillOnOrderCreateEnabled()) {
+			log.debug("Skipping order billing: {} is not enabled", ModuleSettings.AUTO_BILL_ON_ORDER_CREATE);
+			return;
+		}
+		
 		Order realOrder = HibernateUtil.getRealObjectFromProxy(order);
 		List<OrderBillingStrategy> strategies = Context.getRegisteredComponents(OrderBillingStrategy.class);
 		OrderComparator.sort(strategies);

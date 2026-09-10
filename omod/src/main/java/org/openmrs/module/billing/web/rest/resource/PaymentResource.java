@@ -18,8 +18,11 @@ import org.openmrs.module.billing.api.base.ProviderUtil;
 import org.openmrs.module.billing.api.PaymentModeService;
 import org.openmrs.module.billing.web.base.resource.BaseRestDataResource;
 import org.openmrs.module.billing.api.model.Bill;
+import org.openmrs.module.billing.api.model.BillLineItem;
+import org.openmrs.module.billing.api.model.BillLineItemStatus;
 import org.openmrs.module.billing.api.model.Payment;
 import org.openmrs.module.billing.api.model.PaymentAttribute;
+import org.openmrs.module.billing.api.model.PaymentLineItemAllocation;
 import org.openmrs.module.billing.api.model.PaymentMode;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.annotation.PropertyGetter;
@@ -36,7 +39,10 @@ import org.openmrs.module.webservices.rest.web.response.ObjectNotFoundException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -58,6 +64,7 @@ public class PaymentResource extends DelegatingSubResource<Payment, Bill, BillRe
 			description.addProperty("cashier", Representation.REF);
 			description.addProperty("dateCreated");
 			description.addProperty("voided");
+			description.addProperty("lineItems");
 			return description;
 		}
 		
@@ -72,6 +79,7 @@ public class PaymentResource extends DelegatingSubResource<Payment, Bill, BillRe
 		description.addProperty("amount");
 		description.addProperty("amountTendered");
 		description.addProperty("cashier");
+		description.addProperty("lineItems");
 		
 		return description;
 	}
@@ -139,6 +147,104 @@ public class PaymentResource extends DelegatingSubResource<Payment, Bill, BillRe
 		}
 	}
 	
+	@PropertyGetter("lineItems")
+	public List<Map<String, Object>> getLineItems(Payment instance) {
+		List<Map<String, Object>> result = new ArrayList<>();
+		if (instance.getLineItemAllocations() == null) {
+			return result;
+		}
+		for (PaymentLineItemAllocation allocation : instance.getLineItemAllocations()) {
+			if (allocation == null || allocation.getVoided()) {
+				continue;
+			}
+			Map<String, Object> row = new HashMap<>();
+			if (allocation.getBillLineItem() != null) {
+				row.put("uuid", allocation.getBillLineItem().getUuid());
+			}
+			row.put("amount", allocation.getAmount());
+			result.add(row);
+		}
+		return result;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@PropertySetter("lineItems")
+	public void setLineItems(Payment instance, Object lineItemsObj) {
+		if (lineItemsObj == null) {
+			return;
+		}
+		if (!(lineItemsObj instanceof List)) {
+			throw new APIException("lineItems must be a list of { uuid, amount } objects");
+		}
+		List<?> lineItems = (List<?>) lineItemsObj;
+		Bill bill = instance.getBill();
+		BigDecimal allocationSum = BigDecimal.ZERO;
+		for (Object entry : lineItems) {
+			Map<String, Object> map;
+			if (entry instanceof Map) {
+				map = (Map<String, Object>) entry;
+			} else {
+				throw new APIException("Each lineItems entry must be a map with uuid and amount");
+			}
+			String lineUuid = map.get("uuid") != null ? map.get("uuid").toString() : null;
+			if (StringUtils.isBlank(lineUuid)) {
+				throw new APIException("lineItems entry requires uuid");
+			}
+			BillLineItem lineItem = findLineItem(bill, lineUuid);
+			if (lineItem.getStatus() == BillLineItemStatus.PAID || lineItem.getStatus() == BillLineItemStatus.EXEMPTED) {
+				throw new APIException("Cannot allocate payment to line item in status " + lineItem.getStatus());
+			}
+			if (bill != null && (lineItem.getBill() == null || !bill.equals(lineItem.getBill())
+			        && (bill.getUuid() == null || !bill.getUuid().equals(lineItem.getBill().getUuid())))) {
+				throw new APIException("lineItems uuid does not belong to this bill");
+			}
+			BigDecimal amount = toBigDecimal(map.get("amount"));
+			if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+				throw new APIException("lineItems amount must be positive");
+			}
+			allocationSum = allocationSum.add(amount);
+			PaymentLineItemAllocation allocation = new PaymentLineItemAllocation();
+			allocation.setBillLineItem(lineItem);
+			allocation.setAmount(amount);
+			instance.addLineItemAllocation(allocation);
+		}
+		if (instance.getAmountTendered() != null && allocationSum.compareTo(instance.getAmountTendered()) > 0) {
+			throw new APIException("Sum of lineItems amounts cannot exceed amountTendered");
+		}
+	}
+	
+	private BillLineItem findLineItem(Bill bill, String lineUuid) {
+		if (bill != null && bill.getLineItems() != null) {
+			for (BillLineItem lineItem : bill.getLineItems()) {
+				if (lineItem != null && lineUuid.equals(lineItem.getUuid())) {
+					return lineItem;
+				}
+			}
+		}
+		BillLineItem fromService = Context.getService(org.openmrs.module.billing.api.BillLineItemService.class)
+		        .getBillLineItemByUuid(lineUuid);
+		if (fromService != null) {
+			return fromService;
+		}
+		throw new ObjectNotFoundException();
+	}
+	
+	private BigDecimal toBigDecimal(Object amount) {
+		if (amount == null) {
+			throw new APIException("lineItems amount is required");
+		}
+		if (amount instanceof BigDecimal) {
+			return (BigDecimal) amount;
+		}
+		if (amount instanceof Integer) {
+			return BigDecimal.valueOf((Integer) amount);
+		}
+		if (amount instanceof Number) {
+			return BigDecimal.valueOf(((Number) amount).doubleValue());
+		}
+		return new BigDecimal(amount.toString());
+	}
+	
 	@PropertyGetter("dateCreated")
 	public Long getPaymentDate(Payment instance) {
 		return instance.getDateCreated().getTime();
@@ -178,6 +284,7 @@ public class PaymentResource extends DelegatingSubResource<Payment, Bill, BillRe
 		payment.setVoidReason(reason);
 		payment.setVoidedBy(Context.getAuthenticatedUser());
 		
+		bill.synchronizeBillStatus();
 		service.saveBill(bill);
 	}
 	

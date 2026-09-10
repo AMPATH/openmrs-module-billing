@@ -164,9 +164,10 @@ public class TestOrderBillingStrategyTest {
 		BillLineItem lineItem = new BillLineItem();
 		
 		when(cashPointService.getAllCashPoints(false)).thenReturn(Collections.singletonList(cashPoint));
+		when(billService.getBills(any(), isNull())).thenReturn(Collections.emptyList());
 		when(billService.saveBill(any(Bill.class))).thenAnswer(inv -> inv.getArgument(0));
 		
-		strategy.createBill(patient, lineItem, order);
+		strategy.createOrAppendBill(patient, lineItem, order);
 		
 		ArgumentCaptor<Bill> captor = ArgumentCaptor.forClass(Bill.class);
 		verify(billService).saveBill(captor.capture());
@@ -187,7 +188,7 @@ public class TestOrderBillingStrategyTest {
 		when(cashPointService.getAllCashPoints(false)).thenReturn(Collections.singletonList(cashPoint));
 		when(billService.saveBill(any(Bill.class))).thenAnswer(inv -> inv.getArgument(0));
 		
-		strategy.createBill(patient, lineItem, order);
+		strategy.createOrAppendBill(patient, lineItem, order);
 		
 		ArgumentCaptor<Bill> captor = ArgumentCaptor.forClass(Bill.class);
 		verify(billService).saveBill(captor.capture());
