@@ -9,21 +9,20 @@
  */
 package org.openmrs.module.billing.web.rest.resource;
 
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.api.BillableDrugService;
 import org.openmrs.module.billing.api.BillableServiceService;
 import org.openmrs.module.billing.api.BillLineItemService;
 import org.openmrs.module.billing.api.BillService;
-import org.openmrs.module.billing.web.base.resource.BaseRestDataResource;
-import org.openmrs.module.billing.web.rest.controller.base.CashierResourceController;
+import org.openmrs.module.billing.api.base.entity.IEntityDataService;
 import org.openmrs.module.billing.api.model.BillableDrug;
 import org.openmrs.module.billing.api.model.BillableService;
-import org.openmrs.module.billing.api.model.CashierItemPrice;
-import org.openmrs.module.billing.api.base.entity.IEntityDataService;
-import org.openmrs.module.billing.api.model.Bill;
 import org.openmrs.module.billing.api.model.BillLineItem;
+import org.openmrs.module.billing.api.model.BillLineItemStatus;
+import org.openmrs.module.billing.api.util.BillLineItemPriceSnapshot;
+import org.openmrs.module.billing.web.base.resource.BaseRestDataResource;
+import org.openmrs.module.billing.web.rest.controller.base.CashierResourceController;
 import org.openmrs.module.stockmanagement.api.StockManagementService;
 import org.openmrs.module.stockmanagement.api.model.StockItem;
 import org.openmrs.module.webservices.rest.web.RequestContext;
@@ -35,15 +34,13 @@ import org.openmrs.module.webservices.rest.web.representation.DefaultRepresentat
 import org.openmrs.module.webservices.rest.web.representation.FullRepresentation;
 import org.openmrs.module.webservices.rest.web.representation.Representation;
 import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
-
-import java.math.BigDecimal;
+import org.openmrs.module.webservices.rest.web.response.ResourceDoesNotSupportOperationException;
 
 /**
  * REST resource representing a {@link BillLineItem}.
  */
 @Resource(name = RestConstants.VERSION_1 + CashierResourceController.BILLING_NAMESPACE
         + "/billLineItem", supportedClass = BillLineItem.class, supportedOpenmrsVersions = { "2.0 - 2.*" })
-@Slf4j
 public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 	
 	@Override
@@ -56,13 +53,23 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 			description.addProperty("quantity");
 			description.addProperty("price");
 			description.addProperty("priceName");
-			description.addProperty("priceUuid");
 			description.addProperty("lineItemOrder");
 			description.addProperty("batchNumber");
 			description.addProperty("status");
 			return description;
 		}
 		return null;
+	}
+	
+	@Override
+	public DelegatingResourceDescription getCreatableProperties() throws ResourceDoesNotSupportOperationException {
+		DelegatingResourceDescription description = new DelegatingResourceDescription();
+		description.addProperty("quantity");
+		description.addProperty("priceUuid");
+		description.addProperty("status");
+		description.addProperty("lineItemOrder");
+		description.addProperty("batchNumber");
+		return description;
 	}
 	
 	@PropertySetter(value = "item")
@@ -119,46 +126,21 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 		}
 	}
 	
-	@PropertySetter(value = "price")
-	public void setPriceValue(BillLineItem instance, Object price) {
-		if (price instanceof Double || price instanceof Integer) {
-			double priceValue = ((Number) price).doubleValue();
-			instance.setPrice(BigDecimal.valueOf(priceValue));
-		} else {
-			throw new IllegalArgumentException("Unsupported price type: " + price.getClass().getName());
-		}
-	}
-	
-	@PropertySetter(value = "priceName")
-	public void setPriceName(BillLineItem instance, String name) {
-		instance.setPriceName(name);
-	}
-	
 	@PropertyGetter(value = "priceName")
 	public String getPriceName(BillLineItem instance) {
 		String itemName = instance.getPriceName();
 		return StringUtils.isNotBlank(itemName) ? itemName : "";
 	}
 	
+	/**
+	 * Write-only create input: snapshots amount, name, and catalog owner from CashierItemPrice. Does
+	 * not persist a live {@code itemPrice} link.
+	 */
 	@PropertySetter(value = "priceUuid")
 	public void setItemPrice(BillLineItem instance, String uuid) {
-		StockManagementService itemDataService = Context.getService(StockManagementService.class);
-		CashierItemPrice itemPrice = null;
-		if (itemPrice != null) {
-			instance.setItemPrice(itemPrice);
-			instance.setPriceName("");
-		}
-	}
-	
-	@PropertyGetter(value = "priceUuid")
-	public String getItemPriceUuid(BillLineItem instance) {
-		try {
-			CashierItemPrice itemPrice = instance.getItemPrice();
-			return "";
-		}
-		catch (Exception e) {
-			log.warn("Price probably was deleted", e);
-			return "";
+		BillLineItemPriceSnapshot.applyFromPriceUuid(instance, uuid);
+		if (instance.getStatus() == null) {
+			instance.setStatus(BillLineItemStatus.PENDING);
 		}
 	}
 	

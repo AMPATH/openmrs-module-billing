@@ -64,7 +64,8 @@ public class HibernateBillableDrugDAOImpl implements BillableDrugDAO {
 		}
 		
 		TypedQuery<BillableDrug> query = session.createQuery(cq);
-		applyPaging(query, pagingInfo, predicates, sessionFactory, BillableDrug.class);
+		applyPaging(query, pagingInfo, (countCb, countQuery, countRoot) -> buildSearchPredicates(countCb, countRoot, search),
+		    sessionFactory, BillableDrug.class);
 		return query.getResultList();
 	}
 	

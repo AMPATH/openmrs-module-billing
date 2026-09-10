@@ -33,6 +33,7 @@ import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import javax.persistence.criteria.Subquery;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.openmrs.module.billing.api.db.hibernate.PagingUtil.applyPaging;
@@ -100,9 +101,10 @@ public class HibernateBillDAO implements BillDAO {
 		
 		TypedQuery<Bill> query = session.createQuery(cq);
 		
-		List<Predicate> predicates = new ArrayList<>();
-		predicates.add(predicate);
-		applyPaging(query, pagingInfo, predicates, sessionFactory, Bill.class);
+		applyPaging(query, pagingInfo,
+		    (countCb, countQuery, countRoot) -> Collections
+		            .singletonList(countCb.equal(countRoot.get("patient").get("uuid"), patientUuid)),
+		    sessionFactory, Bill.class);
 		
 		return query.getResultList();
 	}
@@ -127,7 +129,9 @@ public class HibernateBillDAO implements BillDAO {
 		
 		TypedQuery<Bill> query = session.createQuery(cq);
 		
-		applyPaging(query, pagingInfo, predicates, sessionFactory, Bill.class);
+		applyPaging(query, pagingInfo,
+		    (countCb, countQuery, countRoot) -> buildBillSearchPredicate(countCb, countQuery, countRoot, billSearch),
+		    sessionFactory, Bill.class);
 		
 		return query.getResultList();
 	}

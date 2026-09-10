@@ -77,7 +77,9 @@ public class HibernateBillableServiceDAOImpl implements BillableServiceDAO {
 		
 		TypedQuery<BillableService> query = session.createQuery(cq);
 		
-		applyPaging(query, pagingInfo, predicates, sessionFactory, BillableService.class);
+		applyPaging(query, pagingInfo,
+		    (countCb, countQuery, countRoot) -> buildBillServicesSearchPredicate(countCb, countRoot, billableServiceSearch),
+		    sessionFactory, BillableService.class);
 		
 		return query.getResultList();
 	}

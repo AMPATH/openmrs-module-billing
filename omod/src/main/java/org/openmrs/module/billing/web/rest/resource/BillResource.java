@@ -139,6 +139,8 @@ public class BillResource extends DataDelegatingCrudResource<Bill> {
 		for (BillLineItem item : instance.getLineItems()) {
 			item.setBill(instance);
 		}
+		// DB requires line_item_order; default any missing values after nested create via priceUuid
+		instance.recalculateLineItemOrder();
 	}
 	
 	@PropertySetter("payments")

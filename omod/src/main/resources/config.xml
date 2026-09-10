@@ -120,6 +120,15 @@
 	</globalProperty>
 
 	<globalProperty>
+		<property>${project.parent.artifactId}.autoBillOnOrderCreate</property>
+		<description>
+			true/false whether creating an Order should automatically create or update a bill via billing strategies.
+			When false, bills must be created manually (e.g. via REST).
+		</description>
+		<defaultValue>false</defaultValue>
+	</globalProperty>
+
+	<globalProperty>
 		<property>${project.parent.artifactId}.autofillPaymentAmount</property>
 		<description>
 			True/false weather or not the payment amount should be automatically filled with the remaining balance.

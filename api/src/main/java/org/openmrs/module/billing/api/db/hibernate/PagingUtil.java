@@ -22,18 +22,28 @@ import java.util.List;
 
 public class PagingUtil {
 	
+	@FunctionalInterface
+	public interface CriteriaPredicateBuilder<T> {
+		
+		List<Predicate> build(CriteriaBuilder cb, CriteriaQuery<?> query, Root<T> root);
+	}
+	
+	private PagingUtil() {
+	}
+	
 	/**
 	 * Applies paging to any entity type query and optionally loads total record count.
 	 *
 	 * @param query The typed query to apply paging to
 	 * @param pagingInfo The paging information (null to skip paging)
-	 * @param predicates The predicates used for filtering (needed for count query)
+	 * @param predicateBuilder Builds predicates for the count query using the count root (joins must be
+	 *            created on the supplied root, not reused from the main query)
 	 * @param sessionFactory The Hibernate session factory
 	 * @param entityClass The entity class being queried
 	 * @param <T> The entity type
 	 */
-	public static <T> void applyPaging(TypedQuery<T> query, PagingInfo pagingInfo, List<Predicate> predicates,
-	        SessionFactory sessionFactory, Class<T> entityClass) {
+	public static <T> void applyPaging(TypedQuery<T> query, PagingInfo pagingInfo,
+	        CriteriaPredicateBuilder<T> predicateBuilder, SessionFactory sessionFactory, Class<T> entityClass) {
 		if (pagingInfo != null && pagingInfo.getPage() > 0 && pagingInfo.getPageSize() > 0) {
 			int offset = (pagingInfo.getPage() - 1) * pagingInfo.getPageSize();
 			query.setFirstResult(offset);
@@ -47,8 +57,11 @@ public class PagingUtil {
 				Root<T> countRoot = countQuery.from(entityClass);
 				countQuery.select(cb.count(countRoot));
 				
-				if (predicates != null && !predicates.isEmpty()) {
-					countQuery.where(predicates.toArray(new Predicate[0]));
+				if (predicateBuilder != null) {
+					List<Predicate> countPredicates = predicateBuilder.build(cb, countQuery, countRoot);
+					if (countPredicates != null && !countPredicates.isEmpty()) {
+						countQuery.where(countPredicates.toArray(new Predicate[0]));
+					}
 				}
 				
 				Long totalCount = session.createQuery(countQuery).getSingleResult();

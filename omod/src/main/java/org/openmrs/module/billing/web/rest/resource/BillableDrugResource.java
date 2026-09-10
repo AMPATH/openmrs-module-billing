@@ -89,7 +89,6 @@ public class BillableDrugResource extends MetadataDelegatingCrudResource<Billabl
 		}
 		if (Strings.isNotEmpty(locationUuid)) {
 			searchTemplate.setLocationUuid(locationUuid);
-			searchTemplate.setIncludeGlobal(true);
 		}
 		String name = context.getParameter("name");
 		if (Strings.isNotEmpty(name)) {

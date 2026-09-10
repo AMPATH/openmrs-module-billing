@@ -106,7 +106,6 @@ public class BillableServiceResource extends MetadataDelegatingCrudResource<Bill
 		}
 		if (Strings.isNotEmpty(locationUuid)) {
 			searchTemplate.setLocationUuid(locationUuid);
-			searchTemplate.setIncludeGlobal(true);
 		}
 		
 		BillableServiceService service = Context.getService(BillableServiceService.class);
@@ -137,6 +136,9 @@ public class BillableServiceResource extends MetadataDelegatingCrudResource<Bill
 	
 	@PropertyGetter(value = "servicePrices")
 	public List<CashierItemPrice> getServicePrices(BillableService instance) {
+		if (instance.getServicePrices() == null) {
+			return new ArrayList<>();
+		}
 		return new ArrayList<>(instance.getServicePrices());
 	}
 	

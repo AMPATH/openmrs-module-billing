@@ -32,6 +32,7 @@ import org.openmrs.api.EncounterService;
 import org.openmrs.api.OrderService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.TestConstants;
+import org.openmrs.module.billing.ModuleSettings;
 import org.openmrs.module.billing.api.BillLineItemService;
 import org.openmrs.module.billing.api.BillService;
 import org.openmrs.module.billing.api.model.Bill;
@@ -67,6 +68,9 @@ public class OrderBillingEventListenerTest extends BaseModuleContextSensitiveTes
 		executeDataSet(TestConstants.BASE_DATASET_DIR + "StockOperationType.xml");
 		executeDataSet(TestConstants.BASE_DATASET_DIR + "CashPointTest.xml");
 		executeDataSet(TestConstants.BASE_DATASET_DIR + "OrderBillingTest.xml");
+		
+		// Existing scenarios exercise the auto-bill pipeline; enable it for these tests.
+		Context.getAdministrationService().setGlobalProperty(ModuleSettings.AUTO_BILL_ON_ORDER_CREATE, "true");
 	}
 	
 	@Test
@@ -99,6 +103,23 @@ public class OrderBillingEventListenerTest extends BaseModuleContextSensitiveTes
 		assertEquals(1, lineItem.getQuantity());
 		assertEquals(new BigDecimal("75.00"), lineItem.getPrice());
 		assertEquals(savedOrder.getId(), lineItem.getOrder().getId());
+	}
+	
+	@Test
+	public void shouldNotCreateBillWhenAutoBillOnOrderCreateDisabled() {
+		Context.getAdministrationService().setGlobalProperty(ModuleSettings.AUTO_BILL_ON_ORDER_CREATE, "false");
+		
+		Concept testConcept = conceptService.getConcept(5497);
+		Encounter encounter = encounterService.getEncounter(3);
+		Patient patient = encounter.getPatient();
+		
+		Order savedOrder = saveNewTestOrder(patient, testConcept, encounter);
+		listener.processOrder(savedOrder);
+		Context.flushSession();
+		
+		List<Bill> bills = billService.getBillsByPatientUuid(patient.getUuid(), null);
+		assertTrue(bills == null || bills.isEmpty(),
+		    "No bill should be created when billing.autoBillOnOrderCreate is false");
 	}
 	
 	@Test
