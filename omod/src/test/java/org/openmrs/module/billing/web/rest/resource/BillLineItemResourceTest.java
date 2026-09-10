@@ -9,9 +9,11 @@
  */
 package org.openmrs.module.billing.web.rest.resource;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -19,15 +21,20 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.openmrs.User;
+import org.openmrs.api.APIException;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.billing.api.BillService;
 import org.openmrs.module.billing.api.model.Bill;
 import org.openmrs.module.billing.api.model.BillLineItem;
+import org.openmrs.module.billing.api.model.BillLineItemStatus;
+import org.openmrs.module.billing.api.model.BillStatus;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 
 /**
@@ -108,9 +115,48 @@ public class BillLineItemResourceTest {
 		lineItem.setId(1);
 		lineItem.setBill(bill);
 		
-		String reason = null;
 		RequestContext context = mock(RequestContext.class);
 		
-		assertThrows(IllegalArgumentException.class, () -> resource.delete(lineItem, reason, context));
+		assertThrows(IllegalArgumentException.class, () -> resource.delete(lineItem, null, context));
+	}
+	
+	@Test
+	public void save_shouldPersistStatusWithoutChangingBillStatus() {
+		Bill bill = new Bill();
+		bill.setId(1);
+		bill.setStatus(BillStatus.PENDING);
+		
+		BillLineItem lineItem = new BillLineItem();
+		lineItem.setId(1);
+		lineItem.setUuid("line-1");
+		lineItem.setBill(bill);
+		lineItem.setQuantity(1);
+		lineItem.setPrice(BigDecimal.TEN);
+		lineItem.setStatus(BillLineItemStatus.PENDING);
+		bill.addLineItem(lineItem);
+		
+		when(billService.saveBill(bill)).thenReturn(bill);
+		
+		lineItem.setStatus(BillLineItemStatus.PAID);
+		BillLineItem saved = resource.save(lineItem);
+		
+		assertSame(lineItem, saved);
+		assertEquals(BillLineItemStatus.PAID, saved.getStatus());
+		assertEquals(BillStatus.PENDING, bill.getStatus());
+		verify(billService).saveBill(bill);
+	}
+	
+	@Test
+	public void save_shouldRejectCreateViaStandaloneResource() {
+		BillLineItem lineItem = new BillLineItem();
+		lineItem.setBill(new Bill());
+		assertThrows(APIException.class, () -> resource.save(lineItem));
+	}
+	
+	@Test
+	public void setStatus_shouldAcceptStringEnum() {
+		BillLineItem lineItem = new BillLineItem();
+		resource.setStatus(lineItem, "paid");
+		assertEquals(BillLineItemStatus.PAID, lineItem.getStatus());
 	}
 }

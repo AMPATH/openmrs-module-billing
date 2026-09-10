@@ -712,7 +712,16 @@ Content-Type: application/json
 
 **Path:** `/ws/rest/v1/billing/billLineItem`
 
-**Create:** Prefer [append](#bill-line-item-append) `POST /bill/{uuid}/lineItem` or nested [bill create](#bill-line-item-nested-on-bill-create) with `quantity` + `priceUuid`. Standalone POST is not fully supported (`getServiceClass` is null).
+**Create:** Prefer [append](#bill-line-item-append) `POST /bill/{uuid}/lineItem` or nested [bill create](#bill-line-item-nested-on-bill-create) with `quantity` + `priceUuid`. Standalone create via `/billLineItem` is not supported.
+
+**Update:** `POST /ws/rest/v1/billing/billLineItem/{uuid}` with updatable `status` and/or `batchNumber`. Updating a line to `PAID` does **not** change the parent bill status — set bill `PAID` manually when ready so more lines can still be added.
+
+```http
+POST /ws/rest/v1/billing/billLineItem/{lineItemUuid}
+Content-Type: application/json
+
+{ "status": "PAID" }
+```
 
 Price amount and name are **snapshotted** from `CashierItemPrice` at create time (no live price FK). Catalog price changes do not rewrite existing lines.
 
@@ -740,10 +749,18 @@ Price amount and name are **snapshotted** from `CashierItemPrice` at create time
 
 - Prefer [append](#bill-line-item-append) when adding a line to an existing bill — avoid full `lineItems` replace on bill update.
 - Create with `priceUuid` only; response includes denormalized `price` / `priceName` / catalog refs.
-- `batchNumber` is for drug lines: set by the frontend (batch dropdown); billing stores it for inventory sync.
+- Update `status` (e.g. `PAID`) or `batchNumber` via `POST /billLineItem/{uuid}`; parent bill status is left unchanged (mark the bill `PAID` manually when finished adding lines).
+- Payments remain the preferred settlement path when recording money; direct `status: PAID` is for explicit line settlement without reallocating the full bill.
 - Void requires a reason and saves the parent bill.
 
+### Example (mark line paid)
 
+```http
+POST /ws/rest/v1/billing/billLineItem/{lineItemUuid}
+Content-Type: application/json
+
+{ "status": "PAID" }
+```
 
 ### Example (append drug line with batch)
 
