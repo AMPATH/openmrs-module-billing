@@ -1,0 +1,59 @@
+[
+    {
+        /*
+        Registers the hibernate filter that scopes billing data to the locations the authenticated user
+        is allowed. Which locations those are is resolved by the allowedlocation module, from the
+        allowed_location user property it also scopes the login location picker with, so that one user
+        property drives both; see BillingLocationFilterListener, which sets the parameter below, and the
+        allowedlocation.* global properties for how the resolution is configured. The filter does
+        nothing at all until billing.dataFilter.enabled is set to true.
+
+        datafilter discovers this file across every module's classpath (classpath*:/filters/hibernate/
+        *.json using OpenmrsClassLoader), the same way it discovers its own built-in registrations, so no
+        changes to the datafilter module itself are needed for this to take effect. What datafilter does
+        with this registration is enable the filter on each session and let the listener set its
+        parameter. The conditions live with the mappings, see below.
+
+        This filter does NOT read datafilter_entity_basis_map, so it needs no per-user grant rows in that
+        table, and it is independent of datafilter's own location based filters, which scope patients and
+        their clinical data rather than any of the billing tables.
+
+        Why "targetClasses" is empty and there is no "condition":
+
+            targetClasses tells datafilter which classes to add the filter to, and there are none to add
+            it to here: every class this filter applies to already declares it, with the condition for
+            its own table, either in Bill.hbm.xml and Cashier.hbm.xml (where the filter-def also lives)
+            or with a @Filter annotation, on BillDiscount and BillRefund. A single condition here could
+            not serve them anyway, since each table reaches org.openmrs.Location differently: a bill
+            through the cash point it was created at, a catalogue entry (BillableService, BillableDrug)
+            through its own nullable location_id, and the rest through one of those two.
+
+            Listing the xml mapped classes here would actively break the server. datafilter can only add
+            filters to a module's mapping file as a whole: it matches the file by its FIRST <class>
+            element (Util.getMappedClassName) and then applies one condition to every class in it. So
+            naming CashPoint, the first class of Cashier.hbm.xml, would have it rewrite that file and add
+            a second, condition-less filter tag to both CashPoint and Timesheet, and a filter with no
+            condition makes hibernate fail to build the session factory (NullPointerException while
+            instantiating the entity persister). Naming Bill, BillLineItem or Payment would silently do
+            nothing instead, since Bill.hbm.xml starts with CashierItemPrice.
+
+        Parameters:
+            allowedLocationIds: the location ids resolved from the user property, plus their descendants
+                                unless allowedlocation.includeDescendants is false. Never empty, an
+                                unmatchable id is used when the user is allowed nothing so that the
+                                filter fails closed.
+
+        Catalogue rows whose location_id is null are global and stay visible to everyone, which is how
+        the searches in HibernateBillableServiceDAOImpl and HibernateBillableDrugDAOImpl treat them and
+        what the billing strategies fall back to when a location has no entry of its own.
+        */
+        "name": "billing_locationBasedBillingFilter",
+        "targetClasses": [],
+        "parameters": [
+            {
+                "name": "allowedLocationIds",
+                "type": "integer"
+            }
+        ]
+    }
+]

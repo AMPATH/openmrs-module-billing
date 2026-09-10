@@ -53,6 +53,18 @@
 			<artifactId>event-api</artifactId>
 		</dependency>
 
+		<!-- provided: the datafilter module only has to be installed on servers that want billing data
+		     scoped by location, see BillingLocationFilterListener -->
+		<dependency>
+			<groupId>org.openmrs.module</groupId>
+			<artifactId>datafilter-api</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.openmrs.module</groupId>
+			<artifactId>allowedlocation-api</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.openmrs.module</groupId>
 			<artifactId>uiframework-api</artifactId>
@@ -127,6 +139,24 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Both are compiled against but must stay off the test classpath. datafilter's
+					     BeanFactoryPostProcessor is picked up by core's component scan of org.openmrs,
+					     so its presence alone rewrites the session factory for every context sensitive
+					     test here and enables the filter registered in filters/hibernate, while the
+					     listener that sets that filter's parameter is not registered because no module
+					     is started in a test. Hibernate then rejects the next query on an enabled
+					     filter with an unset parameter. BillingLocationFilterTest covers the filter by
+					     enabling it on the session itself, which needs neither module. -->
+					<classpathDependencyExcludes>
+						<classpathDependencyExclude>org.openmrs.module:datafilter-api</classpathDependencyExclude>
+						<classpathDependencyExclude>org.openmrs.module:allowedlocation-api</classpathDependencyExclude>
+					</classpathDependencyExcludes>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>
