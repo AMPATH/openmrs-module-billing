@@ -50,6 +50,7 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 			description.addProperty("item");
 			description.addProperty("billableService", Representation.REF);
 			description.addProperty("billableDrug", Representation.REF);
+			description.addProperty("billableDrugObj", Representation.DEFAULT);
 			description.addProperty("quantity");
 			description.addProperty("price");
 			description.addProperty("priceName");
@@ -124,6 +125,11 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 		catch (Exception e) {
 			return "";
 		}
+	}
+	
+	@PropertyGetter(value = "billableDrugObj")
+	public BillableDrug getBillableDrugObj(BillLineItem instance) {
+		return instance.getBillableDrug();
 	}
 	
 	@PropertyGetter(value = "priceName")
