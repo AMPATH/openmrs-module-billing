@@ -172,6 +172,15 @@ public class BillLineItemResource extends BaseRestDataResource<BillLineItem> {
 	}
 	
 	@Override
+	public BillLineItem save(BillLineItem lineItem) {
+		if (lineItem.getBill() == null) {
+			throw new IllegalArgumentException("Line item must belong to a bill");
+		}
+		Context.getService(BillService.class).saveBill(lineItem.getBill());
+		return lineItem;
+	}
+	
+	@Override
 	public void delete(BillLineItem lineItem, String reason, RequestContext context) {
 		if (StringUtils.isBlank(reason)) {
 			throw new IllegalArgumentException("Reason is required");
