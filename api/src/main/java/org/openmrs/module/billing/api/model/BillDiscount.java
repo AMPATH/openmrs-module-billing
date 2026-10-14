@@ -11,6 +11,7 @@ package org.openmrs.module.billing.api.model;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 import org.openmrs.BaseOpenmrsData;
 import org.openmrs.User;
 
@@ -32,6 +33,17 @@ import java.math.RoundingMode;
 @Setter
 @Entity
 @Table(name = "bill_discount")
+/*
+ Scopes bill discounts to the locations a user is allowed, through the cash point of the bill they
+ belong to. The filter-def, and the same condition for the xml mapped billing classes, live in
+ Bill.hbm.xml: hibernate keeps filter definitions in a single namespace, so an annotation mapped
+ class can use one that was declared in a mapping file. The filter only scopes anything while the
+ datafilter module has it enabled on the session, see
+ org.openmrs.module.billing.api.datafilter.BillingLocationFilterListener.
+ */
+@Filter(name = "billing_locationBasedBillingFilter", condition = "bill_id IN (SELECT billing_b.bill_id FROM cashier_bill billing_b"
+        + " WHERE billing_b.cash_point_id IN (SELECT billing_cp.cash_point_id"
+        + " FROM cashier_cash_point billing_cp WHERE billing_cp.location_id IN (:allowedLocationIds)))")
 public class BillDiscount extends BaseOpenmrsData {
 	
 	@Id

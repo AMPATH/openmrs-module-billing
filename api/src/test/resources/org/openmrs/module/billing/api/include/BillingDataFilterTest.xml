@@ -1,0 +1,156 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+
+    This Source Code Form is subject to the terms of the Mozilla Public License,
+    v. 2.0. If a copy of the MPL was not distributed with this file, You can
+    obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+    the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+
+    Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+    graphic logo is a trademark of OpenMRS Inc.
+
+-->
+<!--
+	Billing data spread over two location trees plus a cash point with no location at all, used by
+	BillingLocationFilterTest to check what billing_locationBasedBillingFilter does and does not
+	return. Supplements CoreTest-2.0.xml, which supplies provider 0, patient 0 and user 1. Every id
+	here is 100 or greater so that it cannot collide with the other datasets in this directory.
+-->
+<dataset>
+	<!-- Location tree A: clinic 101 sits under district 100 -->
+	<location location_id="100" name="Scoped District" creator="1" date_created="2012-01-01 00:00:00.0"
+	          retired="false" uuid="a1000000-0000-0000-0000-000000000100"/>
+	<location location_id="101" name="Scoped Clinic" parent_location="100" creator="1"
+	          date_created="2012-01-01 00:00:00.0" retired="false" uuid="a1000000-0000-0000-0000-000000000101"/>
+	<!-- Location tree B, unrelated to A -->
+	<location location_id="200" name="Other Hospital" creator="1" date_created="2012-01-01 00:00:00.0"
+	          retired="false" uuid="a1000000-0000-0000-0000-000000000200"/>
+
+	<cashier_cash_point cash_point_id="100" name="Scoped Clinic Cash Point" location_id="101" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="a2000000-0000-0000-0000-000000000100"/>
+	<cashier_cash_point cash_point_id="200" name="Other Hospital Cash Point" location_id="200" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="a2000000-0000-0000-0000-000000000200"/>
+	<!-- Deliberately has no location, so it belongs to none of the ones a user can be allowed -->
+	<cashier_cash_point cash_point_id="300" name="Unlocated Cash Point" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="a2000000-0000-0000-0000-000000000300"/>
+
+	<cashier_payment_mode payment_mode_id="100" name="Scoping Test Payment Mode" creator="1"
+	                      date_created="2012-01-01 00:00:00.0" retired="false"
+	                      uuid="a3000000-0000-0000-0000-000000000100"/>
+
+	<!-- Catalogue entries: one at the allowed clinic, one at the other hospital, one global -->
+	<cashier_billable_service service_id="100" name="Scoped Clinic Consultation" location_id="101"
+	                          service_status="ENABLED" creator="1" date_created="2012-01-01 00:00:00.0"
+	                          retired="false" uuid="b1000000-0000-0000-0000-000000000100"/>
+	<cashier_billable_service service_id="200" name="Other Hospital Consultation" location_id="200"
+	                          service_status="ENABLED" creator="1" date_created="2012-01-01 00:00:00.0"
+	                          retired="false" uuid="b1000000-0000-0000-0000-000000000200"/>
+	<cashier_billable_service service_id="300" name="Global Consultation" service_status="ENABLED" creator="1"
+	                          date_created="2012-01-01 00:00:00.0" retired="false"
+	                          uuid="b1000000-0000-0000-0000-000000000300"/>
+
+	<cashier_billable_drug billable_drug_id="100" name="Scoped Clinic Paracetamol" location_id="101"
+	                       status="ENABLED" creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                       uuid="b2000000-0000-0000-0000-000000000100"/>
+	<cashier_billable_drug billable_drug_id="200" name="Other Hospital Paracetamol" location_id="200"
+	                       status="ENABLED" creator="1" date_created="2012-01-01 00:00:00.0" retired="false"
+	                       uuid="b2000000-0000-0000-0000-000000000200"/>
+	<cashier_billable_drug billable_drug_id="300" name="Global Paracetamol" status="ENABLED" creator="1"
+	                       date_created="2012-01-01 00:00:00.0" retired="false"
+	                       uuid="b2000000-0000-0000-0000-000000000300"/>
+
+	<!-- A price for each of the six catalogue entries above, plus one that belongs to neither -->
+	<cashier_item_price item_price_id="100" service_id="100" name="default" price="10.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000100"/>
+	<cashier_item_price item_price_id="200" service_id="200" name="default" price="20.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000200"/>
+	<cashier_item_price item_price_id="300" service_id="300" name="default" price="30.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000300"/>
+	<cashier_item_price item_price_id="400" billable_drug_id="100" name="default" price="1.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000400"/>
+	<cashier_item_price item_price_id="500" billable_drug_id="200" name="default" price="2.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000500"/>
+	<cashier_item_price item_price_id="600" billable_drug_id="300" name="default" price="3.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000600"/>
+	<cashier_item_price item_price_id="700" name="unattached" price="4.00" creator="1"
+	                    date_created="2012-01-01 00:00:00.0" retired="false"
+	                    uuid="b3000000-0000-0000-0000-000000000700"/>
+
+	<!-- Bill at the allowed clinic, adjusted by one bill from each location tree -->
+	<cashier_bill bill_id="100" receipt_number="scoped-clinic-receipt" provider_id="0" patient_id="0"
+	              cash_point_id="100" status="POSTED" creator="1" date_created="2012-01-01 00:00:00.0"
+	              voided="false" receipt_printed="0" uuid="a4000000-0000-0000-0000-000000000100"/>
+	<cashier_bill bill_id="101" receipt_number="scoped-clinic-adjustment" provider_id="0" patient_id="0"
+	              cash_point_id="100" status="POSTED" adjusted_bill_id="100" creator="1"
+	              date_created="2012-01-02 00:00:00.0" voided="false" receipt_printed="0"
+	              uuid="a4000000-0000-0000-0000-000000000101"/>
+	<cashier_bill bill_id="200" receipt_number="other-hospital-receipt" provider_id="0" patient_id="0"
+	              cash_point_id="200" status="POSTED" creator="1" date_created="2012-01-01 00:00:00.0"
+	              voided="false" receipt_printed="0" uuid="a4000000-0000-0000-0000-000000000200"/>
+	<cashier_bill bill_id="201" receipt_number="other-hospital-adjustment" provider_id="0" patient_id="0"
+	              cash_point_id="200" status="POSTED" adjusted_bill_id="100" creator="1"
+	              date_created="2012-01-02 00:00:00.0" voided="false" receipt_printed="0"
+	              uuid="a4000000-0000-0000-0000-000000000201"/>
+	<cashier_bill bill_id="300" receipt_number="unlocated-receipt" provider_id="0" patient_id="0"
+	              cash_point_id="300" status="POSTED" creator="1" date_created="2012-01-01 00:00:00.0"
+	              voided="false" receipt_printed="0" uuid="a4000000-0000-0000-0000-000000000300"/>
+
+	<cashier_bill_line_item bill_line_item_id="100" bill_id="100" price="10.00" price_name="default" quantity="1"
+	                        line_item_order="0" status="PENDING" creator="1"
+	                        date_created="2012-01-01 00:00:00.0" voided="false"
+	                        uuid="a5000000-0000-0000-0000-000000000100"/>
+	<cashier_bill_line_item bill_line_item_id="200" bill_id="200" price="20.00" price_name="default" quantity="1"
+	                        line_item_order="0" status="PENDING" creator="1"
+	                        date_created="2012-01-01 00:00:00.0" voided="false"
+	                        uuid="a5000000-0000-0000-0000-000000000200"/>
+	<cashier_bill_line_item bill_line_item_id="300" bill_id="300" price="30.00" price_name="default" quantity="1"
+	                        line_item_order="0" status="PENDING" creator="1"
+	                        date_created="2012-01-01 00:00:00.0" voided="false"
+	                        uuid="a5000000-0000-0000-0000-000000000300"/>
+
+	<cashier_bill_payment bill_payment_id="100" bill_id="100" payment_mode_id="100" amount="10.00"
+	                      amount_tendered="10.00" creator="1" date_created="2012-01-01 00:00:00.0"
+	                      voided="false" uuid="a6000000-0000-0000-0000-000000000100"/>
+	<cashier_bill_payment bill_payment_id="200" bill_id="200" payment_mode_id="100" amount="20.00"
+	                      amount_tendered="20.00" creator="1" date_created="2012-01-01 00:00:00.0"
+	                      voided="false" uuid="a6000000-0000-0000-0000-000000000200"/>
+
+	<bill_discount bill_discount_id="100" bill_id="100" discount_type="PERCENTAGE" discount_value="10.00"
+	               discount_status="APPROVED" justification="Scoped clinic waiver" initiator_id="1" creator="1"
+	               date_created="2012-01-02 00:00:00.0" voided="false"
+	               uuid="a7000000-0000-0000-0000-000000000100"/>
+	<bill_discount bill_discount_id="200" bill_id="200" discount_type="PERCENTAGE" discount_value="20.00"
+	               discount_status="APPROVED" justification="Other hospital waiver" initiator_id="1" creator="1"
+	               date_created="2012-01-02 00:00:00.0" voided="false"
+	               uuid="a7000000-0000-0000-0000-000000000200"/>
+
+	<bill_refund bill_refund_id="100" bill_id="100" refund_amount="10.00" reason="Scoped clinic refund"
+	             refund_status="REQUESTED" initiator_id="1" creator="1" date_created="2012-01-02 00:00:00.0"
+	             voided="false" uuid="a8000000-0000-0000-0000-000000000100"/>
+	<bill_refund bill_refund_id="200" bill_id="200" refund_amount="20.00" reason="Other hospital refund"
+	             refund_status="REQUESTED" initiator_id="1" creator="1" date_created="2012-01-02 00:00:00.0"
+	             voided="false" uuid="a8000000-0000-0000-0000-000000000200"/>
+
+	<cashier_bill_payment_line_item payment_line_item_id="100" bill_payment_id="100" bill_line_item_id="100"
+	                                amount="10.00" creator="1" date_created="2012-01-01 00:00:00.0"
+	                                voided="false" uuid="b4000000-0000-0000-0000-000000000100"/>
+	<cashier_bill_payment_line_item payment_line_item_id="200" bill_payment_id="200" bill_line_item_id="200"
+	                                amount="20.00" creator="1" date_created="2012-01-01 00:00:00.0"
+	                                voided="false" uuid="b4000000-0000-0000-0000-000000000200"/>
+
+	<cashier_timesheet timesheet_id="100" provider_id="0" cash_point_id="100" clock_in="2012-01-01 09:00:00.0"
+	                   creator="1" date_created="2012-01-01 09:00:00.0" voided="false"
+	                   uuid="a9000000-0000-0000-0000-000000000100"/>
+	<cashier_timesheet timesheet_id="200" provider_id="0" cash_point_id="200" clock_in="2012-01-01 09:00:00.0"
+	                   creator="1" date_created="2012-01-01 09:00:00.0" voided="false"
+	                   uuid="a9000000-0000-0000-0000-000000000200"/>
+</dataset>

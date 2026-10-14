@@ -75,6 +75,8 @@ Exposes bills as FHIR `Invoice` resources via the `fhir` submodule, built agains
   - App Framework Module
   - Provider Management Module
   - UI Commons Module
+  - Data Filter Module 2.2.0+ and Allowed Location Module 1.0.0+, together, only to scope billing
+    data by location. See [Location scoped billing data](#location-scoped-billing-data)
 
 ## Installation
 
@@ -408,6 +410,12 @@ configuration.
 | `billing.reports.dailyShiftSummary`     | —       | ID of the Daily Shift Summary report      |
 | `billing.reports.paymentsByPaymentMode` | —       | ID of the Payments by Payment Mode report |
 
+**Location scoping**
+
+| Property                     | Default | Description                                                                                                                                                 |
+| ---------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `billing.dataFilter.enabled` | `false` | Scope billing data to the locations a user is allowed. Requires the Data Filter and Allowed Location modules. See [Location scoped billing data](#location-scoped-billing-data) |
+
 ### Receipt numbering
 
 The default generator hands out sequential receipt numbers. To avoid a database round-trip per bill it reserves a block
@@ -429,6 +437,101 @@ and set `billing.systemReceiptNumberGenerator` to its fully-qualified class name
 the built-in resolver, which reads existing bill records. To override it, implement
 `org.openmrs.module.billing.api.PatientPaymentStatusResolver`, register your implementation as a Spring component in
 your own module so it is discoverable, and set the property to its fully-qualified class name.
+
+## Location scoped billing data
+
+Billing data can be restricted to the locations a user is allowed, so that a cashier at one facility
+does not see the bills, payments, discounts, refunds, cash points or timesheets of another. It is
+**off by default**: installing this version changes nothing until `billing.dataFilter.enabled` is set
+to `true`.
+
+### How it works
+
+Scoping is a Hibernate filter, `billing_locationBasedBillingFilter`, declared on the billing
+mappings (`Bill.hbm.xml`, `Cashier.hbm.xml`, and `@Filter` on `BillDiscount` and `BillRefund`) and
+enabled per session by the [Data Filter module](https://github.com/openmrs/openmrs-module-datafilter),
+which discovers it through `filters/hibernate/billing_location.json` on this module's classpath.
+
+Every billing table reaches a location through something it already has — no columns, tables or
+backfills are added. Transactional records go through the cash point the bill was created at, which is
+also what `GET /bill?location=<uuid>` filters on; catalogue entries carry their own `location_id`:
+
+| Entity | Table | Scoped by |
+| --- | --- | --- |
+| `CashPoint` | `cashier_cash_point` | its own `location_id` |
+| `Bill` | `cashier_bill` | the location of its cash point |
+| `BillLineItem` | `cashier_bill_line_item` | the location of its bill's cash point |
+| `Payment` | `cashier_bill_payment` | the location of its bill's cash point |
+| `PaymentLineItemAllocation` | `cashier_bill_payment_line_item` | the location of its payment's bill |
+| `BillDiscount` | `bill_discount` | the location of its bill's cash point |
+| `BillRefund` | `bill_refund` | the location of its bill's cash point |
+| `Timesheet` | `cashier_timesheet` | the location of its cash point |
+| `BillableService` | `cashier_billable_service` | its own `location_id`, **null means global** |
+| `BillableDrug` | `cashier_billable_drug` | its own `location_id`, **null means global** |
+| `CashierItemPrice` | `cashier_item_price` | the catalogue entry it prices |
+
+A catalogue entry with no location is global and stays visible to everyone, which is what the
+`BillableService` and `BillableDrug` searches already do with `includeGlobal` and what the billing
+strategies fall back to when a location has no entry of its own. So a cashier sees their own facility's
+services and drugs plus the shared ones, and their prices, but not another facility's — and a price
+that belongs to a stock item rather than a catalogue entry is left alone.
+
+Which locations a user is allowed is **not** decided by this module. The
+[Allowed Location module](https://github.com/AMPATH/openmrs-module-allowedlocation) resolves them
+from the `allowed_location` user property it also scopes the login location picker with, so one user
+property and one set of `allowedlocation.*` global properties drive both. A super user is never
+restricted, and by default neither is a user who has no value for that property, so scoping can be
+rolled out user by user.
+
+Because the filter runs in the database, it applies to every read that goes through Hibernate,
+including the REST and FHIR layers, without any change to services, resources or the UI. Paging stays
+consistent too, since the count query is filtered the same way as the query it counts.
+
+### Turning it on
+
+1. Install the Data Filter and Allowed Location modules.
+2. On Java 9 and later, make sure the server passes `--add-opens java.base/java.lang=ALL-UNNAMED`
+   and `--add-opens java.base/java.lang.reflect=ALL-UNNAMED`; Data Filter needs them to install its
+   filters at all.
+3. Give the users that should be restricted an `allowed_location` user property, a comma separated
+   list of location uuids (names are accepted too).
+4. Set `billing.dataFilter.enabled` to `true`.
+
+Assign no property to the users who should keep seeing everything, or set
+`allowedlocation.unrestrictedWhenUnset` to `false` once every user has one, to deny billing data to
+users without the property instead.
+
+### What it does not cover
+
+- **Payment modes and billing exemptions.** `PaymentMode` and `BillExemption` have no location of
+  their own, so they stay visible to everyone; unlike billable services and drugs, they have no
+  per-location variant to scope to.
+- **Cash points with no location.** They belong to no location, so they are scoped out along with
+  their bills. Give every cash point a location before turning scoping on.
+- **Loads by primary key.** Hibernate filters apply to queries, not to `Session.get`/`find`, so
+  `BillService.getBill(Integer)` and associations navigated from an already loaded object are not
+  scoped. Lookups by uuid, including everything the REST layer does, are queries and are scoped.
+- **Writes**, which Hibernate does not police: nothing rejects a bill whose cash point is outside the
+  user's locations when it is flushed. In practice such a write still fails, because the reference has
+  to be resolved first and resolving a uuid is a query — so it fails on the reference, not on the
+  write. The same is true of appending a line item with a `priceUuid` from another facility's
+  catalogue: `BillLineItemPriceSnapshot` looks the price up by uuid and reports
+  `CashierItemPrice not found`.
+- **Jasper reports**, which run their own SQL over a JDBC connection rather than through Hibernate.
+- **Native SQL**, of which this module has one query: `BillLineItemService.getPersistedLineItemIds`,
+  which returns the line item ids of a bill id the caller already holds.
+
+Individual escape hatches come from Data Filter's own conventions: setting the global property
+`billing_locationBasedBillingFilter.disabled` to `true` turns the filter off for everyone, and the
+`billing_locationBasedBillingFilter_ByPass` privilege exempts a role.
+
+### Performance
+
+Each scoped query gains a sub query, over `cashier_cash_point` for transactional records and over the
+catalogue tables for prices; both are small in practice. For large `cashier_bill` tables make sure
+`cashier_cash_point.location_id` and `cashier_bill.cash_point_id` are indexed, and that
+`cashier_billable_service.location_id` and `cashier_billable_drug.location_id` are too; foreign key
+columns are indexed automatically on MySQL.
 
 ## Documentation
 

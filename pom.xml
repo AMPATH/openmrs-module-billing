@@ -56,6 +56,13 @@
 		<stockmanagementVersion>1.4.0</stockmanagementVersion>
 		<fhir2Version>2.4.0</fhir2Version>
 		<eventVersion>4.0.0</eventVersion>
+		<!-- Both are only used to compile the location scoping in api/.../api/datafilter, neither module
+		     has to be installed at runtime. allowedlocation has not been released yet, so this points at
+		     its snapshot: it has to name a released version before this module can be released, and
+		     until then a local `mvn install` of https://github.com/AMPATH/openmrs-module-allowedlocation
+		     is needed to build. -->
+		<datafilterVersion>2.2.0</datafilterVersion>
+		<allowedlocationVersion>1.0.0-SNAPSHOT</allowedlocationVersion>
 		<lombokVersion>1.18.38</lombokVersion>
 		<byteBuddyVersion>1.17.6</byteBuddyVersion>
 	</properties>
@@ -151,6 +158,24 @@
 				<groupId>org.openmrs</groupId>
 				<artifactId>event-api</artifactId>
 				<version>${eventVersion}</version>
+				<scope>provided</scope>
+			</dependency>
+
+			<!-- Optional at runtime: billing contributes a filter registration and a DataFilterListener
+			     to the datafilter module's extension points, and does not need it to be installed. -->
+			<dependency>
+				<groupId>org.openmrs.module</groupId>
+				<artifactId>datafilter-api</artifactId>
+				<version>${datafilterVersion}</version>
+				<scope>provided</scope>
+			</dependency>
+
+			<!-- Optional at runtime too: it resolves the locations a user is allowed for the filter
+			     registered above, see BillingLocationFilterListener. -->
+			<dependency>
+				<groupId>org.openmrs.module</groupId>
+				<artifactId>allowedlocation-api</artifactId>
+				<version>${allowedlocationVersion}</version>
 				<scope>provided</scope>
 			</dependency>
 

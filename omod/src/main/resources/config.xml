@@ -32,6 +32,11 @@
 		<aware_of_module version="${appframeworkVersion}">org.openmrs.module.appframework</aware_of_module>
 		<aware_of_module version="${providerManagementVersion}">org.openmrs.module.providermanagement</aware_of_module>
 		<aware_of_module version="1.7">org.openmrs.module.uicommons</aware_of_module>
+		<!-- Both are only needed on servers that want billing data scoped by location: the filter
+		     registration in filters/hibernate/billing_location.json and the DataFilterListener that
+		     drives it are ignored unless the two of them are running. -->
+		<aware_of_module version="${datafilterVersion}">org.openmrs.module.datafilter</aware_of_module>
+		<aware_of_module version="${allowedlocationVersion}">org.openmrs.module.allowedlocation</aware_of_module>
 	</aware_of_modules>
 
 	<require_modules>
@@ -202,6 +207,23 @@
 		</description>
 	</globalProperty>
 
+	<!-- Location scoping of billing data, see the "Location scoped billing data" section of the
+	     README. Requires the datafilter and allowedlocation modules; which locations a user is allowed
+	     is configured there, with the allowedlocation.* global properties. -->
+	<globalProperty>
+		<property>${project.parent.artifactId}.dataFilter.enabled</property>
+		<defaultValue>false</defaultValue>
+		<description>
+			true/false whether billing data is scoped to the locations a user is allowed, which the
+			allowedlocation module reads from their allowed_location user property. Defaults to false, so
+			installing this version changes nothing until an administrator turns it on. When true, bills,
+			bill line items, payments and their line item allocations, discounts, refunds, cash points and
+			timesheets are only returned by queries if the location of the cash point they belong to is one
+			the user is allowed, and billable services, billable drugs and their prices only if their own
+			location is, with the ones that have no location staying visible everywhere. A super user, and
+			by default a user with no allowed_location property, are not restricted.
+		</description>
+	</globalProperty>
 
 	<!-- Extensions -->
 	<!--	<extension>-->

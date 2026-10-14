@@ -15,6 +15,32 @@
 		"http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
 <hibernate-mapping package="org.openmrs.module.billing.api.model">
 
+	<!--
+		Scopes billing data to a set of locations. A bill and everything hanging off it are reached
+		through the location of the cash point the bill was created at, which is also what
+		BillSearch.locationUuid filters on; a catalogue entry (BillableService, BillableDrug) is reached
+		through its own location_id, where null means the entry is global and stays visible everywhere.
+		The parameter is set per session by the billing module's DataFilterListener, see
+		org.openmrs.module.billing.api.datafilter.BillingLocationFilterListener and the registration in
+		filters/hibernate/billing_location.json. A filter that is never enabled has no effect on any
+		query, so declaring it here is inert unless the datafilter module is installed and
+		billing.dataFilter.enabled is true.
+
+		The condition is declared per class rather than here, because each table reaches the location
+		differently. Every column of a table referenced in a sub query is qualified with an alias, and
+		only the filtered table's own column is left unqualified, so that hibernate's alias injection
+		prefixes that one column and leaves the sub queries alone. A condition whose top level is OR or
+		AND brackets itself, because hibernate appends each filter as " and <condition>" with no
+		parentheses of its own.
+
+		These filters govern queries, so a bill fetched by id (BillDAO.getBill) and any association
+		navigated from an already loaded object are NOT scoped, which is hibernate's documented behaviour
+		for filters and the same limitation datafilter has.
+	-->
+	<filter-def name="billing_locationBasedBillingFilter">
+		<filter-param name="allowedLocationIds" type="integer"/>
+	</filter-def>
+
 	<class name="org.openmrs.module.billing.api.model.CashierItemPrice" table="cashier_item_price">
 		<cache usage="read-write"/>
 		<id name="id" type="int" column="item_price_id">
@@ -48,6 +74,15 @@
 		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
 
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<!-- Prices belong to a catalogue entry and follow it, see the filter-def above. A price of a
+		     stock item belongs to no catalogue entry and is left alone. -->
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="((service_id IS NULL OR service_id IN (SELECT billing_bs.service_id
+		                   FROM cashier_billable_service billing_bs
+		                   WHERE billing_bs.location_id IN (:allowedLocationIds) OR billing_bs.location_id IS NULL))
+		                   AND (billable_drug_id IS NULL OR billable_drug_id IN (SELECT billing_bd.billable_drug_id
+		                   FROM cashier_billable_drug billing_bd
+		                   WHERE billing_bd.location_id IN (:allowedLocationIds) OR billing_bd.location_id IS NULL)))"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.BillableService" table="cashier_billable_service">
@@ -93,6 +128,9 @@
 		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
 
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<!-- A catalogue entry with no location is global, see the filter-def above -->
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="(location_id IN (:allowedLocationIds) OR location_id IS NULL)"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.BillableDrug" table="cashier_billable_drug">
@@ -133,6 +171,9 @@
 		<property name="retireReason" type="java.lang.String" column="retire_reason" length="255"/>
 
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<!-- A catalogue entry with no location is global, see the filter-def above -->
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="(location_id IN (:allowedLocationIds) OR location_id IS NULL)"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.Bill" table="cashier_bill">
@@ -183,6 +224,10 @@
 		<set name="adjustedBy" lazy="true" inverse="true">
 			<key column="adjusted_bill_id"/>
 			<one-to-many class="org.openmrs.module.billing.api.model.Bill"/>
+			<!-- Class level filters are not applied to collection loads, so this repeats Bill's own -->
+			<filter name="billing_locationBasedBillingFilter"
+			        condition="cash_point_id IN (SELECT billing_cp.cash_point_id FROM cashier_cash_point billing_cp
+			                   WHERE billing_cp.location_id IN (:allowedLocationIds))"/>
 		</set>
 
 		<property name="receiptPrinted" column="receipt_printed" type="java.lang.Boolean" length="1" not-null="true"/>
@@ -203,6 +248,9 @@
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
 		<property name="adjustmentReason" type="java.lang.String" column="adjustment_reason" length="500"
 		          not-null="false"/>
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="cash_point_id IN (SELECT billing_cp.cash_point_id FROM cashier_cash_point billing_cp
+		                   WHERE billing_cp.location_id IN (:allowedLocationIds))"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.BillLineItem" table="cashier_bill_line_item">
@@ -249,6 +297,11 @@
 		<property name="voidReason" type="java.lang.String" column="void_reason" length="255"/>
 
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="bill_id IN (SELECT billing_b.bill_id FROM cashier_bill billing_b
+		                   WHERE billing_b.cash_point_id IN (SELECT billing_cp.cash_point_id
+		                   FROM cashier_cash_point billing_cp
+		                   WHERE billing_cp.location_id IN (:allowedLocationIds)))"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.Payment" table="cashier_bill_payment">
@@ -289,6 +342,11 @@
 		<property name="dateVoided" type="java.util.Date" column="date_voided" length="19"/>
 		<property name="voidReason" type="java.lang.String" column="void_reason" length="255"/>
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="bill_id IN (SELECT billing_b.bill_id FROM cashier_bill billing_b
+		                   WHERE billing_b.cash_point_id IN (SELECT billing_cp.cash_point_id
+		                   FROM cashier_cash_point billing_cp
+		                   WHERE billing_cp.location_id IN (:allowedLocationIds)))"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.PaymentLineItemAllocation" table="cashier_bill_payment_line_item">
@@ -316,6 +374,12 @@
 		<property name="dateVoided" type="java.util.Date" column="date_voided" length="19"/>
 		<property name="voidReason" type="java.lang.String" column="void_reason" length="255"/>
 		<property name="uuid" type="java.lang.String" column="uuid" length="38" unique="true"/>
+		<filter name="billing_locationBasedBillingFilter"
+		        condition="bill_payment_id IN (SELECT billing_p.bill_payment_id FROM cashier_bill_payment billing_p
+		                   WHERE billing_p.bill_id IN (SELECT billing_b.bill_id FROM cashier_bill billing_b
+		                   WHERE billing_b.cash_point_id IN (SELECT billing_cp.cash_point_id
+		                   FROM cashier_cash_point billing_cp
+		                   WHERE billing_cp.location_id IN (:allowedLocationIds))))"/>
 	</class>
 
 	<class name="org.openmrs.module.billing.api.model.PaymentAttribute" table="cashier_bill_payment_attribute">
